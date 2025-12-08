@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="glass-card" style="max-width: 600px; margin: 0 auto;">
+    <h1>Student Portal</h1>
+
+    <form id="leaveForm">
+        <div class="form-group">
+            <label for="name">Full Name</label>
+            <input type="text" id="name" required placeholder="Enter your name">
+        </div>
+
+        <div class="form-group">
+            <label for="roll_no">Roll Number</label>
+            <input type="text" id="roll_no" required placeholder="Ex: 21CSE001">
+        </div>
+
+        <div class="form-group">
+            <label for="date">Date of Leave</label>
+            <input type="date" id="date" required>
+        </div>
+
+        <div class="form-group">
+            <label for="reason">Reason for Leave</label>
+            <textarea id="reason" rows="3" required placeholder="Briefly explain the reason..."></textarea>
+        </div>
+
+        <button type="submit" id="submitBtn">Submit Leave Request</button>
+    </form>
+
+    <div id="resultArea" class="hidden"
+        style="margin-top: 2rem; border-top: 1px solid var(--glass-border); padding-top: 2rem;">
+        <h2>Updated Status</h2>
+        <div class="status-grid">
+            <div class="status-card">
+                <div class="status-value" id="attendanceValue">--%</div>
+                <div class="status-label">Current Attendance</div>
+            </div>
+            <div class="status-card">
+                <div class="status-value" id="leaveDateValue"
+                    style="font-size: 1.2rem; display: flex; align-items: center; justify-content: center; height: 38px;">
+                    --</div>
+                <div class="status-label">Last Leave Date</div>
+            </div>
+        </div>
+        <p id="message" style="margin-top: 1rem; text-align: center; color: var(--success);"></p>
+    </div>
+</div>
+
+<script>
+    document.getElementById('leaveForm').addEventListener('submit', async function (e) {
+        e.preventDefault();
+
+        const btn = document.getElementById('submitBtn');
+        const originalText = btn.innerText;
+        btn.innerText = 'Submitting...';
+        btn.disabled = true;
+
+        const data = {
+            name: document.getElementById('name').value,
+            roll_no: document.getElementById('roll_no').value,
+            date: document.getElementById('date').value,
+            reason: document.getElementById('reason').value
+        };
+
+        try {
+            const response = await fetch('/api/submit_leave', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(data)
+            });
+
+            const result = await response.json();
+
+            if (response.ok) {
+                document.getElementById('resultArea').classList.remove('hidden');
+                document.getElementById('attendanceValue').innerText = result.new_attendance_percentage + '%';
+                document.getElementById('leaveDateValue').innerText = result.last_leave_date;
+                document.getElementById('message').innerText = result.message;
+                document.getElementById('message').style.color = 'var(--success)';
+            } else {
+                document.getElementById('resultArea').classList.remove('hidden');
+                document.getElementById('attendanceValue').innerText = '--';
+                document.getElementById('leaveDateValue').innerText = '--';
+                document.getElementById('message').innerText = result.error || 'Something went wrong';
+                document.getElementById('message').style.color = 'var(--error)';
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            document.getElementById('resultArea').classList.remove('hidden');
+            document.getElementById('message').innerText = 'Failed to connect to the server. Please check your connection.';
+            document.getElementById('message').style.color = 'var(--error)';
+        } finally {
+            btn.innerText = originalText;
+            btn.disabled = false;
+        }
+    });
+</script>
+{% endblock %}

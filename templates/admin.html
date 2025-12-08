@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="glass-card">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
+        <h1>Admin Dashboard</h1>
+        <button onclick="loadRecords()" style="width: auto; padding: 0.5rem 1.5rem;">Refresh</button>
+    </div>
+
+    <div class="table-container">
+        <table>
+            <thead>
+                <tr>
+                    <th>Roll No</th>
+                    <th>Name</th>
+                    <th>Date</th>
+                    <th>Reason</th>
+                    <th>Submitted At</th>
+                </tr>
+            </thead>
+            <tbody id="recordsBody">
+                <!-- Records will be populated here -->
+                <tr>
+                    <td colspan="5" style="text-align: center;">Loading records...</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+    async function loadRecords() {
+        const tbody = document.getElementById('recordsBody');
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align: center;">Loading...</td></tr>';
+
+        try {
+            const response = await fetch('/api/records');
+            const records = await response.json();
+
+            tbody.innerHTML = '';
+
+            if (records.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: var(--text-muted);">No records found</td></tr>';
+                return;
+            }
+
+            records.forEach(record => {
+                const row = document.createElement('tr');
+                // Format timestamp if present
+                const submittedAt = record.timestamp ? new Date(record.timestamp).toLocaleString() : 'N/A';
+
+                row.innerHTML = `
+                <td>${record.roll_no}</td>
+                <td>${record.name}</td>
+                <td>${record.date}</td>
+                <td>${record.reason}</td>
+                <td style="color: var(--text-muted); font-size: 0.85rem;">${submittedAt}</td>
+            `;
+                tbody.appendChild(row);
+            });
+
+        } catch (error) {
+            console.error('Error:', error);
+            tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: var(--error);">Failed to load records</td></tr>';
+        }
+    }
+
+    // Load on page load
+    document.addEventListener('DOMContentLoaded', loadRecords);
+</script>
+{% endblock %}
