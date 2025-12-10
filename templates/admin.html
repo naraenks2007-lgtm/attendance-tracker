@@ -34,7 +34,7 @@
         tbody.innerHTML = '<tr><td colspan="5" style="text-align: center;">Loading...</td></tr>';
 
         try {
-            const response = await fetch('/api/records');
+            const response = await fetch('https://attendance-tracker-0rm4.onrender.com/api/records');
             const records = await response.json();
 
             tbody.innerHTML = '';
