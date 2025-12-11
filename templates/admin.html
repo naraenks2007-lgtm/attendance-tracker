@@ -34,7 +34,7 @@
         tbody.innerHTML = '<tr><td colspan="5" style="text-align: center;">Loading...</td></tr>';
 
         try {
-            const response = await fetch('https://attendance-tracker-0rm4.onrender.com/api/records');
+            const response = await fetch('/api/records');
             const records = await response.json();
 
             tbody.innerHTML = '';
@@ -46,7 +46,6 @@
 
             records.forEach(record => {
                 const row = document.createElement('tr');
-                // Format timestamp if present
                 const submittedAt = record.timestamp ? new Date(record.timestamp).toLocaleString() : 'N/A';
 
                 row.innerHTML = `
@@ -65,7 +64,7 @@
         }
     }
 
-    // Load on page load
     document.addEventListener('DOMContentLoaded', loadRecords);
 </script>
+
 {% endblock %}

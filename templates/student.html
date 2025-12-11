@@ -64,8 +64,7 @@
         };
 
         try {
-            const response = await fetch('https://attendance-tracker-0rm4.onrender.com/api/submit_leave', {
-
+            const response = await fetch('/api/submit_leave', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'

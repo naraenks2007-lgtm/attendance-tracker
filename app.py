@@ -7,10 +7,9 @@ app = Flask(__name__)
 
 DB_NAME = "leave_records.db"
 
-
 # ========= DB HELPER FUNCTIONS =========
 def init_db():
-    """Create the database and table if not exists."""
+    """Create the database and table if it doesn't exist."""
     conn = sqlite3.connect(DB_NAME)
     cur = conn.cursor()
     cur.execute("""
@@ -29,13 +28,12 @@ def init_db():
 
 def get_all_records():
     conn = sqlite3.connect(DB_NAME)
-    conn.row_factory = sqlite3.Row  # so we can access by column name
+    conn.row_factory = sqlite3.Row
     cur = conn.cursor()
     cur.execute("SELECT name, roll_no, date, reason, timestamp FROM records ORDER BY id DESC")
     rows = cur.fetchall()
     conn.close()
 
-    # convert rows to list of dicts
     records = []
     for row in rows:
         records.append({
@@ -63,26 +61,30 @@ def add_record(name, roll_no, date, reason):
 
 @app.route("/")
 def student():
-    return render_template("student.html")  # :contentReference[oaicite:1]{index=1}
+    # templates/student.html
+    return render_template("student.html")
 
 
 @app.route("/admin")
 def admin():
-    return render_template("admin.html")    # :contentReference[oaicite:2]{index=2}
+    # templates/admin.html
+    return render_template("admin.html")
 
 
 # ========= APIS =========
 
 @app.route("/api/submit_leave", methods=["POST"])
 def submit_leave():
-    data = request.get_json()
+    data = request.get_json() or {}
 
     name = data.get("name")
     roll_no = data.get("roll_no")
     date = data.get("date")
     reason = data.get("reason")
 
-    # Save into database instead of list
+    if not all([name, roll_no, date, reason]):
+        return jsonify({"error": "All fields are required"}), 400
+
     add_record(name, roll_no, date, reason)
 
     return jsonify({
@@ -93,12 +95,13 @@ def submit_leave():
 
 
 @app.route("/api/records", methods=["GET"])
-def get_records():
+def get_records_api():
     records = get_all_records()
     return jsonify(records), 200
 
 
 if __name__ == "__main__":
-    # Initialize DB when app starts
     init_db()
-    app.run(debug=True)
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port)
+
