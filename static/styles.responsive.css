@@ -1,0 +1,170 @@
+/* styles.responsive.css
+   Mobile-first responsive tweaks for login, student and admin pages.
+   Drop this in static/ and include after your main CSS.
+*/
+
+/* --- Base improvements for small screens --- */
+:root {
+  --mobile-gap: 12px;
+  --mobile-padding: 14px;
+  --card-radius-mobile: 12px;
+}
+
+/* Ensure body uses full-viewport height and touch-friendly font size */
+html, body {
+  height: 100%;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-size: 15px; /* base for smaller screens */
+}
+
+/* Make main stage / wrapper fluid */
+.stage, .wrap {
+  width: 100%;
+  max-width: 1100px;
+  padding-left: var(--mobile-padding);
+  padding-right: var(--mobile-padding);
+  box-sizing: border-box;
+}
+
+/* Lottie / Illustration area: responsive height */
+.illustration {
+  min-height: 220px;
+  height: auto;
+}
+
+/* Login card: make full width on small screens, remove horizontal transform */
+.card {
+  margin: 18px auto;
+  padding: 18px;
+  border-radius: var(--card-radius-mobile);
+}
+
+/* Make inputs larger and easier to tap */
+input[type="text"],
+input[type="email"],
+input[type="password"],
+input[type="date"],
+input[type="number"],
+textarea,
+select,
+button {
+  font-size: 16px;
+  padding: 12px 14px;
+  touch-action: manipulation;
+}
+
+/* Buttons full-width on small screens */
+.btn, .btn-primary, .btn-ghost {
+  width: 100%;
+  display: inline-block;
+  padding: 12px 14px;
+  box-sizing: border-box;
+}
+
+/* Tabs: allow wrapping */
+.tabs { flex-wrap: wrap; gap: 8px; }
+
+/* Grid -> single column under 900px */
+@media (max-width: 900px) {
+  .grid { grid-template-columns: 1fr !important; gap: var(--mobile-gap) !important; }
+  .stage { grid-template-columns: 1fr !important; gap: 18px !important; }
+  .card { padding: 16px !important; }
+  .tabs { gap: 6px; }
+  .title { font-size: 18px !important; }
+  .subtitle { font-size: 13px !important; }
+  .illustration { min-height: 240px; }
+  /* Make small muted text slightly smaller */
+  .muted, .small { font-size: 13px; }
+}
+
+/* Very small phones */
+@media (max-width: 420px) {
+  html, body { font-size: 14px; }
+  .card { padding: 14px; border-radius: 10px; }
+  input, textarea, select { font-size: 15px; padding: 10px; }
+  .btn { padding: 10px; font-size: 15px; }
+  .logo { font-size: 12px; }
+}
+
+/* --- Student page: responsive status cards --- */
+.status-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+}
+@media (max-width: 900px){
+  .status-grid { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 420px){
+  .status-grid { grid-template-columns: 1fr; }
+}
+
+/* --- Admin page: make table horizontally scrollable, and show cards on tiny screens --- */
+.table-responsive {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+@media (max-width: 680px) {
+  /* convert table rows into stacked cards for readability */
+  table.responsive-table, table.responsive-table thead, table.responsive-table tbody, table.responsive-table th, table.responsive-table td, table.responsive-table tr {
+    display: block;
+  }
+  table.responsive-table thead tr {
+    position: absolute;
+    top: -9999px;
+    left: -9999px;
+  }
+  table.responsive-table tr {
+    margin: 0 0 var(--mobile-gap) 0;
+    border: 1px solid #eee;
+    padding: 10px;
+    border-radius: 10px;
+    background: #fff;
+  }
+  table.responsive-table td {
+    border: none;
+    position: relative;
+    padding-left: 50%;
+    white-space: normal;
+    text-align: left;
+  }
+  table.responsive-table td::before {
+    position: absolute;
+    left: 12px;
+    top: 12px;
+    width: 45%;
+    padding-right: 10px;
+    white-space: nowrap;
+    font-weight: 700;
+    color: #333;
+  }
+  /* provide labels for each column — keep in sync with your table headers */
+  table.responsive-table td:nth-of-type(1)::before { content: "Date"; }
+  table.responsive-table td:nth-of-type(2)::before { content: "Roll No"; }
+  table.responsive-table td:nth-of-type(3)::before { content: "Name"; }
+  table.responsive-table td:nth-of-type(4)::before { content: "Attended"; }
+  table.responsive-table td:nth-of-type(5)::before { content: "Absent"; }
+  table.responsive-table td:nth-of-type(6)::before { content: "Reason"; }
+  table.responsive-table td:nth-of-type(7)::before { content: "Actions"; }
+}
+
+/* Make chart canvas responsive */
+canvas { max-width: 100% !important; height: auto !important; }
+
+/* Improve touch target size for action buttons in tables */
+.actionBtn, .actionBtn small {
+  min-width: 44px;
+  min-height: 36px;
+  padding: 8px 10px;
+  font-size: 14px;
+}
+
+/* Small accessibility tweaks */
+[role="button"], button, a { -webkit-tap-highlight-color: rgba(0,0,0,0.1); }
+
+/* Reduce shadows on mobile for performance */
+@media (max-width: 480px) {
+  .card, .illustration, .status-card { box-shadow: none; }
+}
