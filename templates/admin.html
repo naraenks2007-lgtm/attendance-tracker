@@ -1,70 +1,865 @@
-{% extends "base.html" %}
+<!doctype html>
+<html lang="en">
 
-{% block content %}
-<div class="glass-card">
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
-        <h1>Admin Dashboard</h1>
-        <button onclick="loadRecords()" style="width: auto; padding: 0.5rem 1.5rem;">Refresh</button>
-    </div>
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Admin — Attendance Manager</title>
 
-    <div class="table-container">
-        <table>
-            <thead>
-                <tr>
-                    <th>Roll No</th>
-                    <th>Name</th>
-                    <th>Date</th>
-                    <th>Reason</th>
-                    <th>Submitted At</th>
-                </tr>
-            </thead>
-            <tbody id="recordsBody">
-                <!-- Records will be populated here -->
-                <tr>
-                    <td colspan="5" style="text-align: center;">Loading records...</td>
-                </tr>
-            </tbody>
-        </table>
-    </div>
-</div>
+    <!-- libs: jsPDF for PDF, Chart.js for charts -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
-<script>
-    async function loadRecords() {
-        const tbody = document.getElementById('recordsBody');
-        tbody.innerHTML = '<tr><td colspan="5" style="text-align: center;">Loading...</td></tr>';
+    <style>
+        :root {
+            --accent: #0b8457;
+            --muted: #6b7280;
+            --bg: #f6f8f7;
+            --card: #fff;
+            --border: #e6ece6;
+        }
 
-        try {
-            const response = await fetch('/api/records');
-            const records = await response.json();
+        * {
+            box-sizing: border-box;
+            font-family: system-ui, Segoe UI, Arial
+        }
 
-            tbody.innerHTML = '';
+        body {
+            margin: 0;
+            background: var(--bg);
+            padding: 20px;
+            color: #0b2330;
+        }
 
-            if (records.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: var(--text-muted);">No records found</td></tr>';
-                return;
+        .wrap {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 18px;
+        }
+
+        h1 {
+            margin: 0;
+            font-size: 20px;
+        }
+
+        .card {
+            background: var(--card);
+            padding: 14px;
+            border-radius: 10px;
+            border: 1px solid var(--border);
+            box-shadow: 0 10px 30px rgba(8, 20, 15, 0.04);
+            margin-bottom: 14px;
+        }
+
+        .row {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        input[type="date"],
+        input[type="text"],
+        select {
+            padding: 8px 10px;
+            border-radius: 8px;
+            border: 1px solid #dfeee6;
+        }
+
+        button {
+            padding: 9px 12px;
+            border-radius: 8px;
+            border: none;
+            cursor: pointer;
+            font-weight: 600;
+        }
+
+        .btn-primary {
+            background: var(--accent);
+            color: #fff;
+        }
+
+        .btn-ghost {
+            background: white;
+            border: 1px solid var(--border);
+            color: var(--muted);
+        }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-top: 10px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 12px;
+            font-size: 14px;
+        }
+
+        th,
+        td {
+            padding: 8px;
+            border: 1px solid #f1f4f1;
+            text-align: left;
+            vertical-align: top;
+        }
+
+        th {
+            background: #f3faf6;
+            font-weight: 700;
+        }
+
+        .muted {
+            color: var(--muted);
+            font-size: 13px;
+        }
+
+        .small {
+            font-size: 13px;
+            color: var(--muted);
+        }
+
+        .countBox {
+            padding: 10px 12px;
+            background: #eaf7ee;
+            border-radius: 8px;
+            border: 1px solid #cfead0;
+            font-weight: 700;
+            display: inline-block;
+        }
+
+        .chartWrap {
+            margin-top: 12px;
+        }
+
+        .searchBox {
+            width: 260px;
+            padding: 8px 10px;
+            border-radius: 8px;
+            border: 1px solid #e0eee3;
+        }
+
+        .actionBtn {
+            padding: 6px 8px;
+            border-radius: 6px;
+            cursor: pointer;
+            border: 1px solid var(--border);
+            background: white;
+        }
+
+        /* modal */
+        .modalBack {
+            position: fixed;
+            inset: 0;
+            background: rgba(6, 8, 9, 0.45);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 50;
+        }
+
+        .modal {
+            background: var(--card);
+            padding: 16px;
+            border-radius: 8px;
+            width: 640px;
+            max-width: 94%;
+            box-shadow: 0 30px 70px rgba(8, 20, 15, 0.2);
+        }
+
+        .modal h3 {
+            margin: 0 0 8px 0
+        }
+
+        .flexCols {
+            display: flex;
+            gap: 12px;
+        }
+
+        @media(max-width:900px) {
+            .flexCols {
+                flex-direction: column
             }
 
-            records.forEach(record => {
-                const row = document.createElement('tr');
-                const submittedAt = record.timestamp ? new Date(record.timestamp).toLocaleString() : 'N/A';
+            .searchBox {
+                width: 100%
+            }
+        }
+    </style>
+</head>
 
-                row.innerHTML = `
-                <td>${record.roll_no}</td>
-                <td>${record.name}</td>
-                <td>${record.date}</td>
-                <td>${record.reason}</td>
-                <td style="color: var(--text-muted); font-size: 0.85rem;">${submittedAt}</td>
-            `;
-                tbody.appendChild(row);
+<body>
+    <div class="wrap">
+
+        <header>
+            <div>
+                <h1>Admin — Attendance Manager</h1>
+                <div class="small muted">View, edit, export attendance & absentees</div>
+            </div>
+
+            <div id="authArea" class="card" style="display:flex;align-items:center;gap:10px;">
+                <!-- login UI inserted by JS if not logged in -->
+            </div>
+        </header>
+
+        <!-- Main dashboard (hidden until admin login) -->
+        <div id="dashboard" style="display:none;">
+            <div class="card">
+                <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;">
+                    <div class="row">
+                        <label class="small">Filter date (single):</label>
+                        <input type="date" id="filterDate" />
+                        <button class="btn-primary" onclick="loadByDate()">Load</button>
+                        <label class="small" style="margin-left:8px">Or date range:</label>
+                        <input type="date" id="fromDate" />
+                        <input type="date" id="toDate" />
+                        <button class="btn-ghost" onclick="loadByRange()">Load Range</button>
+                    </div>
+
+                    <div class="row">
+                        <input class="searchBox" placeholder="Search roll or name..." id="searchInput" />
+                        <button class="btn-ghost" onclick="searchRecords()">Search</button>
+                        <button class="actionBtn" onclick="showAll()">Show All</button>
+                        <button class="btn-primary" onclick="downloadPDF()">Download PDF</button>
+                        <button class="btn-primary" onclick="downloadCSV()">Download CSV</button>
+                        <button class="btn-ghost" onclick="clearAllLocal()">Delete All Records</button>
+                    </div>
+                </div>
+
+                <div style="margin-top:12px;display:flex;gap:12px;align-items:center;flex-wrap:wrap;">
+                    <div id="countBox" class="countBox">Total records: 0</div>
+                    <div class="small muted" id="summaryText">—</div>
+                </div>
+
+                <div class="chartWrap card" style="margin-top:12px;">
+                    <canvas id="attendanceChart" height="90"></canvas>
+                </div>
+            </div>
+
+            <!-- table -->
+            <div class="card">
+                <div style="display:flex;justify-content:space-between;align-items:center;">
+                    <div><strong>Records</strong> <span class="small muted" id="recordsInfo">(showing latest)</span>
+                    </div>
+                    <div class="small muted">Tip: click Edit to change, Delete to remove record</div>
+                </div>
+
+                <table id="recordsTable">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Roll No</th>
+                            <th>Name</th>
+                            <th>Attended</th>
+                            <th>Absent</th>
+                            <th>Reason</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="recordsBody"></tbody>
+                </table>
+            </div>
+
+            <!-- Full-year summary per student -->
+            <div class="card">
+                <h3>Full-year summary per student</h3>
+                <div class="small muted">Aggregated across all saved records</div>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Roll No</th>
+                            <th>Name</th>
+                            <th>Total Sessions</th>
+                            <th>Total Attended</th>
+                            <th>Total Absent</th>
+                            <th>Attendance %</th>
+                        </tr>
+                    </thead>
+                    <tbody id="summaryBody"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit modal -->
+    <div id="modalBack" class="modalBack" role="dialog" aria-modal="true">
+        <div class="modal">
+            <h3>Edit Record</h3>
+            <div id="modalForm" class="flexCols">
+                <div style="flex:1">
+                    <label class="small">Date</label>
+                    <input type="date" id="edit_date" />
+                    <label class="small" style="margin-top:8px">Roll No</label>
+                    <input type="text" id="edit_roll" />
+                </div>
+                <div style="flex:1">
+                    <label class="small">Name</label>
+                    <input type="text" id="edit_name" />
+                    <label class="small" style="margin-top:8px">Attended</label>
+                    <input type="number" id="edit_attended" min="0" />
+                </div>
+            </div>
+
+            <div style="margin-top:8px">
+                <label class="small">Total sessions (default 6)</label>
+                <input type="number" id="edit_total" min="1" value="6" />
+            </div>
+
+            <div style="margin-top:8px">
+                <label class="small">Reason</label>
+                <input type="text" id="edit_reason" />
+            </div>
+
+            <div style="margin-top:12px; display:flex; gap:8px; justify-content:flex-end;">
+                <button class="btn-ghost" onclick="closeModal()">Cancel</button>
+                <button class="btn-primary" onclick="saveEdit()">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        /* ================== ADMIN IMPLEMENTATION ================== */
+
+        /* Change these credentials if you want */
+        const ADMIN_CREDENTIALS = { username: 'admin', password: 'admin123' };
+
+        /* Utility: read all leave records from localStorage (keys starting with leaves_) */
+        function getAllRecords() {
+            const out = [];
+            for (let i = 0; i < localStorage.length; i++) {
+                const k = localStorage.key(i);
+                if (!k) continue;
+                if (k.startsWith('leaves_')) {
+                    try {
+                        const arr = JSON.parse(localStorage.getItem(k));
+                        if (Array.isArray(arr)) out.push(...arr);
+                    } catch (e) { console.warn('Invalid JSON for', k); }
+                }
+            }
+            return out;
+        }
+
+        /* Utility: save back records for a particular roll (overwrites leaves_<roll>) */
+        function saveRecordsForRoll(roll, arr) {
+            localStorage.setItem('leaves_' + roll, JSON.stringify(arr));
+        }
+
+        /* Auth UI */
+        const authArea = document.getElementById('authArea');
+        function renderAuth() {
+            const logged = sessionStorage.getItem('admin_logged_in') === 'true';
+            authArea.innerHTML = '';
+            if (!logged) {
+                // show login form
+                const div = document.createElement('div');
+                div.style.display = 'flex';
+                div.style.gap = '8px';
+                div.style.alignItems = 'center';
+                div.innerHTML = `
+      <input id="adminUser" placeholder="admin" style="padding:8px;border-radius:8px;border:1px solid var(--border)"/>
+      <input id="adminPass" placeholder="password" type="password" style="padding:8px;border-radius:8px;border:1px solid var(--border)"/>
+      <button class="btn-primary" id="adminLoginBtn">Login</button>
+    `;
+                authArea.appendChild(div);
+                document.getElementById('adminLoginBtn').addEventListener('click', adminLogin);
+            } else {
+                const div = document.createElement('div');
+                div.style.display = 'flex';
+                div.style.gap = '12px';
+                div.style.alignItems = 'center';
+                div.innerHTML = `<div class="small muted">Admin</div><button class="btn-ghost" id="logoutBtn">Logout</button>`;
+                authArea.appendChild(div);
+                document.getElementById('logoutBtn').addEventListener('click', () => {
+                    sessionStorage.removeItem('admin_logged_in');
+                    renderAuth();
+                    document.getElementById('dashboard').style.display = 'none';
+                });
+                // show dashboard
+                document.getElementById('dashboard').style.display = 'block';
+                refreshAllViews();
+            }
+        }
+
+        /* admin login */
+        function adminLogin() {
+            const u = document.getElementById('adminUser').value.trim();
+            const p = document.getElementById('adminPass').value;
+            if (u === ADMIN_CREDENTIALS.username && p === ADMIN_CREDENTIALS.password) {
+                sessionStorage.setItem('admin_logged_in', 'true');
+                renderAuth();
+            } else {
+                alert('Invalid admin credentials');
+            }
+        }
+
+        /* Initial render */
+        renderAuth();
+
+        /* ========== Dashboard functions ========== */
+
+        function showAll() {
+            const all = getAllRecords().sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+            renderTable(all);
+            updateCount(all);
+            updateSummary(all);
+            drawChart(all);
+        }
+
+        /* Load by single date */
+        function loadByDate() {
+            const d = document.getElementById('filterDate').value;
+            if (!d) { alert('Pick a date.'); return; }
+            const all = getAllRecords().filter(r => r.date === d);
+            renderTable(all);
+            updateCount(all);
+            updateSummary(all);
+            drawChart(all);
+        }
+
+        /* Load by date range */
+        function loadByRange() {
+            const from = document.getElementById('fromDate').value;
+            const to = document.getElementById('toDate').value;
+            if (!from || !to) { alert('Select both from and to dates.'); return; }
+            if (new Date(from) > new Date(to)) { alert('From must be <= To'); return; }
+            const all = getAllRecords().filter(r => (new Date(r.date) >= new Date(from) && new Date(r.date) <= new Date(to)));
+            renderTable(all);
+            updateCount(all);
+            updateSummary(all);
+            drawChart(all);
+        }
+
+        /* Search by roll or name */
+        function searchRecords() {
+            const q = document.getElementById('searchInput').value.trim().toLowerCase();
+            if (!q) { showAll(); return; }
+            const all = getAllRecords().filter(r => (r.roll_no && r.roll_no.toLowerCase().includes(q)) || (r.name && r.name.toLowerCase().includes(q)));
+            renderTable(all);
+            updateCount(all);
+            updateSummary(all);
+            drawChart(all);
+        }
+
+        /* Render table rows */
+        function renderTable(records) {
+            const tbody = document.getElementById('recordsBody');
+            tbody.innerHTML = '';
+            if (!records || !records.length) {
+                document.getElementById('recordsInfo').innerText = '(no records)';
+                return;
+            }
+            document.getElementById('recordsInfo').innerText = `(${records.length} records)`;
+            // sort newest first
+            records.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+            records.forEach((r, idx) => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+      <td>${r.date || ''}</td>
+      <td>${r.roll_no || ''}</td>
+      <td>${r.name || ''}</td>
+      <td>${r.attended != null ? r.attended : ''}</td>
+      <td>${r.absent != null ? r.absent : ''}</td>
+      <td>${r.reason ? escapeHtml(r.reason) : ''}</td>
+      <td>
+        <button class="actionBtn" onclick="openEdit('${encodeURIComponent(r.roll_no || '')}', ${idx})">Edit</button>
+        <button class="actionBtn" onclick="deleteRecord('${encodeURIComponent(r.roll_no || '')}', ${idx})">Delete</button>
+      </td>
+    `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        /* Keep globalRecords used by edit/delete (we regenerate when showing table) */
+        let globalRecordsSnapshot = [];
+
+        /* Update count and small summary */
+        function updateCount(records) {
+            const countBox = document.getElementById('countBox');
+            countBox.innerText = `Total records: ${records.length || 0}`;
+        }
+
+        /* Full-year attendance aggregation */
+        function updateSummary(records) {
+            // aggregate by roll
+            const map = {};
+            const all = getAllRecords(); // full data for aggregation irrespective of filtered view
+            all.forEach(r => {
+                const key = r.roll_no || 'unknown';
+                if (!map[key]) map[key] = { roll: r.roll_no, name: r.name || '', total: 0, attended: 0, absent: 0 };
+                map[key].total += Number(r.total_classes || 0);
+                map[key].attended += Number(r.attended || 0);
+                map[key].absent += Number(r.absent || 0);
             });
 
-        } catch (error) {
-            console.error('Error:', error);
-            tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: var(--error);">Failed to load records</td></tr>';
+            const tbody = document.getElementById('summaryBody');
+            tbody.innerHTML = '';
+            const arr = Object.values(map).sort((a, b) => (a.roll || '').localeCompare(b.roll || ''));
+            arr.forEach(item => {
+                const pct = item.total ? Math.round((item.attended / item.total) * 10000) / 100 : 0;
+                const tr = document.createElement('tr');
+                tr.innerHTML = `<td>${item.roll || ''}</td><td>${item.name || ''}</td><td>${item.total}</td><td>${item.attended}</td><td>${item.absent}</td><td>${pct}%</td>`;
+                tbody.appendChild(tr);
+            });
+
+            // small summary text
+            const totalRecords = all.length;
+            const uniqueStudents = arr.length;
+            document.getElementById('summaryText').innerText = `${totalRecords} total records • ${uniqueStudents} students`;
         }
-    }
 
-    document.addEventListener('DOMContentLoaded', loadRecords);
-</script>
+        /* Chart: show absentees or attendance over time */
+        let chartInstance = null;
+        function drawChart(records) {
+            // build dataset: count absentees per date
+            const map = {};
+            records.forEach(r => {
+                const d = r.date || (r.timestamp ? r.timestamp.split('T')[0] : 'unknown');
+                if (!map[d]) map[d] = { date: d, absentees: 0, totalAttended: 0, totalSessions: 0 };
+                map[d].absentees += (Number(r.absent) || 0) > 0 ? 1 : 0; // count student absent if absent > 0
+                map[d].totalAttended += Number(r.attended || 0);
+                map[d].totalSessions += Number(r.total_classes || 0);
+            });
 
-{% endblock %}
+            const arr = Object.values(map).sort((a, b) => new Date(a.date) - new Date(b.date));
+            const labels = arr.map(x => x.date);
+            const absentees = arr.map(x => x.absentees);
+            const attendancePct = arr.map(x => x.totalSessions ? Math.round((x.totalAttended / x.totalSessions) * 10000) / 100 : 0);
+
+            const ctx = document.getElementById('attendanceChart').getContext('2d');
+            if (chartInstance) chartInstance.destroy();
+            chartInstance = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels,
+                    datasets: [
+                        { type: 'bar', label: 'Number of students absent (count)', data: absentees, backgroundColor: 'rgba(255,99,132,0.6)' },
+                        { type: 'line', label: 'Attendance % (avg)', data: attendancePct, borderColor: 'rgba(75,192,192,1)', yAxisID: 'pct', tension: 0.3 }
+                    ]
+                },
+                options: {
+                    interaction: { mode: 'index', intersect: false },
+                    scales: {
+                        y: { beginAtZero: true, title: { display: true, text: 'Count' } },
+                        pct: { position: 'right', title: { display: true, text: 'Attendance %' }, min: 0, max: 100, grid: { display: false } }
+                    }
+                }
+            });
+        }
+
+        /* ========== Edit / Delete ========== */
+
+        /* Build flattened snapshot (list of records with original roll group) */
+        function buildGlobalSnapshot() {
+            const all = [];
+            for (let i = 0; i < localStorage.length; i++) {
+                const k = localStorage.key(i);
+                if (!k || !k.startsWith('leaves_')) continue;
+                try {
+                    const arr = JSON.parse(localStorage.getItem(k));
+                    if (!Array.isArray(arr)) continue;
+                    arr.forEach((rec, idx) => {
+                        all.push(Object.assign({ __storedKey: k, __idx: idx }, rec));
+                    });
+                } catch (e) { }
+            }
+            globalRecordsSnapshot = all;
+            return all;
+        }
+
+        /* Delete single record by roll and index (index relative to that roll array) */
+        function deleteRecord(encodedRoll, idxInSnapshot) {
+            // rebuild snapshot and find record to delete using index passed (we assume stable ordering from render)
+            const snap = buildGlobalSnapshot().sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+            const rec = snap[idxInSnapshot];
+            if (!rec) {
+                alert('Record not found.');
+                return;
+            }
+            if (!confirm('Delete record for ' + rec.roll_no + ' on ' + rec.date + '?')) return;
+            // load array for that roll
+            const rollKey = rec.__storedKey; // leaves_<roll>
+            const arr = JSON.parse(localStorage.getItem(rollKey)) || [];
+            // find by timestamp (safe)
+            const foundIdx = arr.findIndex(r => r.timestamp === rec.timestamp);
+            if (foundIdx >= 0) {
+                arr.splice(foundIdx, 1);
+                localStorage.setItem(rollKey, JSON.stringify(arr));
+                alert('Deleted.');
+                refreshAllViews();
+            } else {
+                alert('Could not delete — record mismatch.');
+            }
+        }
+
+        /* Open edit modal. We'll pass roll and index from snapshot ordering. For simplicity we locate by timestamp like delete */
+        function openEdit(encodedRoll, idxInSnapshot) {
+            const snap = buildGlobalSnapshot().sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+            const rec = snap[idxInSnapshot];
+            if (!rec) { alert('Record not found'); return; }
+            // populate modal
+            document.getElementById('edit_date').value = rec.date || rec.timestamp.split('T')[0];
+            document.getElementById('edit_roll').value = rec.roll_no || '';
+            document.getElementById('edit_name').value = rec.name || '';
+            document.getElementById('edit_attended').value = rec.attended || 0;
+            document.getElementById('edit_total').value = rec.total_classes || 6;
+            document.getElementById('edit_reason').value = rec.reason || '';
+            // store edit meta in dataset
+            const modalBack = document.getElementById('modalBack');
+            modalBack.dataset.storeKey = rec.__storedKey;
+            modalBack.dataset.timestamp = rec.timestamp;
+            modalBack.style.display = 'flex';
+        }
+
+        /* close modal */
+        function closeModal() {
+            const modalBack = document.getElementById('modalBack');
+            modalBack.style.display = 'none';
+            modalBack.dataset.storeKey = '';
+            modalBack.dataset.timestamp = '';
+        }
+
+        /* save edit */
+        function saveEdit() {
+            const modalBack = document.getElementById('modalBack');
+            const key = modalBack.dataset.storeKey;
+            const timestamp = modalBack.dataset.timestamp;
+            if (!key || !timestamp) { alert('No record selected'); return; }
+            let arr = JSON.parse(localStorage.getItem(key)) || [];
+            const idx = arr.findIndex(r => r.timestamp === timestamp);
+            if (idx < 0) { alert('Record not found'); closeModal(); return; }
+
+            // gather edits
+            const newDate = document.getElementById('edit_date').value;
+            const newRoll = document.getElementById('edit_roll').value.trim();
+            const newName = document.getElementById('edit_name').value.trim();
+            const newAttended = Number(document.getElementById('edit_attended').value) || 0;
+            const newTotal = Number(document.getElementById('edit_total').value) || 6;
+            const newReason = document.getElementById('edit_reason').value.trim();
+            const newAbsent = Math.max(0, newTotal - newAttended);
+
+            // update object
+            arr[idx].date = newDate;
+            arr[idx].roll_no = newRoll;
+            arr[idx].name = newName;
+            arr[idx].attended = newAttended;
+            arr[idx].total_classes = newTotal;
+            arr[idx].absent = newAbsent;
+            arr[idx].reason = newReason;
+
+            // If the roll changed (key changed), remove from old key and move to new key
+            const oldKey = key;
+            const newKey = 'leaves_' + newRoll;
+            if (oldKey !== newKey) {
+                // remove from old, save new array to new key
+                const oldArr = JSON.parse(localStorage.getItem(oldKey)) || [];
+                const removeIdx = oldArr.findIndex(r => r.timestamp === timestamp);
+                if (removeIdx >= 0) oldArr.splice(removeIdx, 1);
+                localStorage.setItem(oldKey, JSON.stringify(oldArr));
+                // push to new key array
+                const newArr = JSON.parse(localStorage.getItem(newKey)) || [];
+                newArr.push(arr[idx]);
+                localStorage.setItem(newKey, JSON.stringify(newArr));
+                alert('Saved and moved to new roll key.');
+            } else {
+                localStorage.setItem(oldKey, JSON.stringify(arr));
+                alert('Saved.');
+            }
+            closeModal();
+            refreshAllViews();
+        }
+
+        /* Delete all records for a roll */
+        function deleteAllForRoll(roll) {
+            if (!roll) { alert('Provide roll'); return; }
+            if (!confirm('Delete all records for ' + roll + '?')) return;
+            localStorage.removeItem('leaves_' + roll);
+            alert('Deleted.');
+            refreshAllViews();
+        }
+
+        /* Delete all records for a specific date */
+        function deleteAllForDate(date) {
+            if (!date) { alert('Pick a date'); return; }
+            if (!confirm('Delete all records for ' + date + '?')) return;
+            // iterate keys and remove records that match date
+            for (let i = 0; i < localStorage.length; i++) {
+                const k = localStorage.key(i);
+                if (!k || !k.startsWith('leaves_')) continue;
+                try {
+                    let arr = JSON.parse(localStorage.getItem(k));
+                    arr = arr.filter(r => r.date !== date);
+                    localStorage.setItem(k, JSON.stringify(arr));
+                } catch (e) { }
+            }
+            alert('Deleted records for ' + date);
+            refreshAllViews();
+        }
+
+        /* Clear everything (dangerous) */
+        function clearAllLocal() {
+            if (!confirm('Delete all leaves_* items from localStorage? This cannot be undone.')) return;
+            const keys = [];
+            for (let i = 0; i < localStorage.length; i++) {
+                const k = localStorage.key(i);
+                if (k && k.startsWith('leaves_')) keys.push(k);
+            }
+            keys.forEach(k => localStorage.removeItem(k));
+            alert('All leave records removed.');
+            refreshAllViews();
+        }
+
+        /* ========== PDF AND CSV EXPORT ========== */
+
+        /* Export the currently visible table (based on last render) */
+        function downloadPDF() {
+            const date = document.getElementById('filterDate').value;
+            const from = document.getElementById('fromDate').value;
+            const to = document.getElementById('toDate').value;
+            const q = document.getElementById('searchInput').value.trim();
+
+            // choose records based on filters: try by single date -> by range -> by search -> all
+            let records = getAllRecords();
+            if (date) records = records.filter(r => r.date === date);
+            else if (from && to) records = records.filter(r => new Date(r.date) >= new Date(from) && new Date(r.date) <= new Date(to));
+            if (q) records = records.filter(r => (r.roll_no || '').toLowerCase().includes(q.toLowerCase()) || (r.name || '').toLowerCase().includes(q.toLowerCase()));
+
+            if (!records.length) { alert('No records to export'); return; }
+
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF({ unit: 'pt', format: 'a4' });
+            doc.setFontSize(14);
+            doc.text('Absentees / Attendance Report', 40, 40);
+            doc.setFontSize(10);
+            const meta = `Generated: ${new Date().toLocaleString()} • Records: ${records.length}`;
+            doc.text(meta, 40, 56);
+
+            // table
+            let y = 80;
+            records.forEach((r, i) => {
+                doc.text(`${i + 1}. ${r.date} • ${r.roll_no} • ${r.name}`, 40, y);
+                y += 14;
+                doc.text(`   Attended: ${r.attended} / ${r.total_classes}  Absent: ${r.absent}  Reason: ${r.reason || '-'}`, 44, y);
+                y += 18;
+                if (y > 720) { doc.addPage(); y = 40; }
+            });
+
+            doc.save(`Attendance_Report_${Date.now()}.pdf`);
+        }
+
+        /* CSV */
+        function downloadCSV() {
+            let records = getAllRecords();
+            const date = document.getElementById('filterDate').value;
+            const from = document.getElementById('fromDate').value;
+            const to = document.getElementById('toDate').value;
+            const q = document.getElementById('searchInput').value.trim();
+
+            if (date) records = records.filter(r => r.date === date);
+            else if (from && to) records = records.filter(r => new Date(r.date) >= new Date(from) && new Date(r.date) <= new Date(to));
+            if (q) records = records.filter(r => (r.roll_no || '').toLowerCase().includes(q.toLowerCase()) || (r.name || '').toLowerCase().includes(q.toLowerCase()));
+
+            if (!records.length) { alert('No records'); return; }
+
+            const header = ['date', 'roll_no', 'name', 'total_classes', 'attended', 'absent', 'reason', 'timestamp'];
+            const rows = records.map(r => header.map(h => `"${String(r[h] ?? '').replace(/"/g, '""')}"`).join(','));
+            const csv = [header.join(','), ...rows].join('\n');
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `Attendance_${Date.now()}.csv`;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        /* ========== Helpers & refresh ========== */
+
+        function escapeHtml(s) { return String(s || '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+
+        function refreshAllViews() {
+            // show all records and update views
+            const all = getAllRecords();
+            renderTable(all);
+            updateCount(all);
+            updateSummary(all);
+            drawChart(all);
+            // ensure dashboard visible
+            document.getElementById('dashboard').style.display = 'block';
+        }
+
+        /* Rebuild global snapshot when rendering table so edit/delete indices match */
+        function renderTable(records) {
+            // Build snapshot and pass to existing function to render rows with stable indices
+            const snapshot = buildGlobalSnapshot().sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+            // We'll render rows using snapshot so edit/delete refer to snapshot index
+            const tbody = document.getElementById('recordsBody');
+            tbody.innerHTML = '';
+            if (!snapshot.length) { document.getElementById('recordsInfo').innerText = '(no records)'; return; }
+            document.getElementById('recordsInfo').innerText = `(${snapshot.length} records)`;
+            snapshot.forEach((r, idx) => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+      <td>${r.date || ''}</td>
+      <td>${r.roll_no || ''}</td>
+      <td>${r.name || ''}</td>
+      <td>${r.attended != null ? r.attended : ''}</td>
+      <td>${r.absent != null ? r.absent : ''}</td>
+      <td>${r.reason ? escapeHtml(r.reason) : ''}</td>
+      <td>
+        <button class="actionBtn" onclick="openEdit('${encodeURIComponent(r.roll_no || '')}', ${idx})">Edit</button>
+        <button class="actionBtn" onclick="deleteRecord('${encodeURIComponent(r.roll_no || '')}', ${idx})">Delete</button>
+      </td>
+    `;
+                tbody.appendChild(tr);
+            });
+            // update count based on snapshot
+            updateCount(snapshot);
+            updateSummary(snapshot);
+            drawChart(snapshot);
+        }
+
+        /* Build snapshot: flatten all leaves_* arrays into list, with metadata __storedKey and timestamp preserved */
+        function buildGlobalSnapshot() {
+            const all = [];
+            for (let i = 0; i < localStorage.length; i++) {
+                const k = localStorage.key(i);
+                if (!k || !k.startsWith('leaves_')) continue;
+                try {
+                    const arr = JSON.parse(localStorage.getItem(k)) || [];
+                    arr.forEach(rec => {
+                        all.push(Object.assign({}, rec, { __storedKey: k, timestamp: rec.timestamp || new Date().toISOString() }));
+                    });
+                } catch (e) { }
+            }
+            return all;
+        }
+
+        /* On load, if admin already logged in show dashboard */
+        if (sessionStorage.getItem('admin_logged_in') === 'true') {
+            renderAuth();
+        } else {
+            // show auth form
+            renderAuth();
+        }
+
+        /* Close/open modal helpers */
+        document.getElementById('modalBack').addEventListener('click', (ev) => {
+            if (ev.target.id === 'modalBack') closeModal();
+        });
+
+        /* initial full load if logged in */
+        if (sessionStorage.getItem('admin_logged_in') === 'true') refreshAllViews();
+
+    </script>
+</body>
+
+</html>

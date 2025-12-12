@@ -1,0 +1,448 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Login — Student / Teacher</title>
+
+  <!-- Lottie (keeps left illustration animated) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/lottie-web/5.10.1/lottie.min.js" defer></script>
+
+  <style>
+    :root {
+      --accent: #5b4fff;
+      --muted: #6b7280;
+      --card-bg: rgba(255, 255, 255, 0.94);
+      --glass-border: rgba(15, 23, 36, 0.06);
+      --success: #0b8457;
+    }
+
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap');
+
+    * {
+      box-sizing: border-box
+    }
+
+    body {
+      min-height: 100vh;
+      margin: 0;
+      font-family: Inter, system-ui, Arial;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background:
+        radial-gradient(1200px 600px at 8% 8%, rgba(91, 79, 255, 0.06), transparent 7%),
+        linear-gradient(180deg, #f3f6ff 0%, #ffffff 100%);
+      padding: 40px 20px;
+      overflow: hidden;
+    }
+
+    .stage {
+      width: 100%;
+      max-width: 1100px;
+      height: 640px;
+      display: grid;
+      grid-template-columns: 1fr 460px;
+      gap: 32px;
+      align-items: center;
+      position: relative;
+    }
+
+    .illustration {
+      position: relative;
+      height: 100%;
+      border-radius: 18px;
+      overflow: hidden;
+      box-shadow: 0 30px 60px rgba(18, 38, 63, 0.08);
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.95), rgba(255, 255, 255, 0.9));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    #lottieBox {
+      width: 100%;
+      height: 100%;
+      display: block;
+      pointer-events: none;
+    }
+
+    .card {
+      background: var(--card-bg);
+      border-radius: 14px;
+      padding: 28px;
+      box-shadow: 0 30px 60px rgba(16, 24, 40, 0.12);
+      border: 1px solid var(--glass-border);
+      position: relative;
+      z-index: 2;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      transform: translateX(60px);
+      opacity: 0;
+      animation: slideIn 760ms cubic-bezier(.2, .9, .2, 1) 300ms forwards;
+    }
+
+    @keyframes slideIn {
+      to {
+        transform: translateX(0);
+        opacity: 1;
+      }
+    }
+
+    .tabs {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .tab {
+      padding: 8px 14px;
+      border-radius: 999px;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 14px;
+      color: var(--muted);
+      background: transparent;
+      border: none;
+      transition: all 220ms ease;
+    }
+
+    .tab.active {
+      color: white;
+      background: linear-gradient(90deg, var(--accent), #7a6bff 60%);
+      box-shadow: 0 6px 18px rgba(91, 79, 255, 0.18);
+    }
+
+    .title {
+      margin-top: 6px;
+      font-size: 20px;
+      font-weight: 700;
+      color: #0f1724;
+    }
+
+    .subtitle {
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    form {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      margin-top: 6px;
+    }
+
+    label {
+      font-size: 13px;
+      color: #263238;
+      font-weight: 600;
+      margin-bottom: 6px;
+      display: block;
+    }
+
+    input[type="text"],
+    input[type="password"],
+    input[type="email"] {
+      padding: 12px 14px;
+      border-radius: 10px;
+      border: 1px solid rgba(15, 23, 36, 0.06);
+      background: rgba(255, 255, 255, 0.95);
+      outline: none;
+      transition: box-shadow 180ms, transform 180ms;
+      font-size: 14px;
+      color: #072031;
+      width: 100%;
+    }
+
+    input:focus {
+      box-shadow: 0 8px 26px rgba(91, 79, 255, 0.12);
+      transform: translateY(-1px);
+      border-color: rgba(91, 79, 255, 0.22);
+    }
+
+    .forgot {
+      font-size: 13px;
+      color: var(--muted);
+      text-align: right;
+      cursor: pointer;
+    }
+
+    .btn {
+      margin-top: 6px;
+      background: linear-gradient(90deg, var(--accent), #7a6bff);
+      color: white;
+      border: none;
+      padding: 12px 14px;
+      border-radius: 12px;
+      font-weight: 700;
+      cursor: pointer;
+      box-shadow: 0 10px 30px rgba(91, 79, 255, 0.14);
+      transition: transform 160ms ease, box-shadow 160ms ease;
+    }
+
+    .btn:active {
+      transform: translateY(1px) scale(.998);
+      box-shadow: 0 6px 18px rgba(91, 79, 255, 0.1);
+    }
+
+    .divider {
+      height: 1px;
+      background: linear-gradient(90deg, rgba(15, 23, 36, 0.04), rgba(15, 23, 36, 0));
+      margin: 6px 0 10px;
+      border-radius: 4px;
+    }
+
+    .small {
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    @media (max-width:980px) {
+      .stage {
+        grid-template-columns: 1fr;
+        max-width: 760px;
+        padding: 12px 8px;
+        height: auto;
+      }
+
+      .illustration {
+        min-height: 260px;
+        height: 320px;
+      }
+
+      .card {
+        transform: none;
+        animation: none;
+        margin-top: -60px;
+        width: 100%;
+      }
+    }
+
+    .float-shape {
+      position: absolute;
+      border-radius: 50%;
+      filter: blur(28px);
+      opacity: 0.7;
+      z-index: 0;
+      pointer-events: none;
+      transform: translateY(0);
+      animation: floaty 6s ease-in-out infinite alternate;
+    }
+
+    .fs1 {
+      width: 220px;
+      height: 220px;
+      left: -40px;
+      top: -40px;
+      background: radial-gradient(circle at 30% 30%, rgba(91, 79, 255, 0.35), rgba(91, 79, 255, 0.06));
+    }
+
+    .fs2 {
+      width: 160px;
+      height: 160px;
+      right: -40px;
+      bottom: -60px;
+      background: radial-gradient(circle at 10% 30%, rgba(79, 209, 197, 0.32), rgba(79, 209, 197, 0.02));
+      animation-duration: 8s;
+    }
+
+    @keyframes floaty {
+      to {
+        transform: translateY(-22px)
+      }
+    }
+
+    .error {
+      color: #c0392b;
+      font-size: 13px;
+      display: none;
+      margin-top: 6px;
+    }
+
+    .ok {
+      color: var(--success);
+      font-size: 13px;
+      display: none;
+      margin-top: 6px;
+    }
+  </style>
+</head>
+
+<body>
+
+  <div class="stage" aria-live="polite">
+    <div class="float-shape fs1" aria-hidden="true"></div>
+    <div class="float-shape fs2" aria-hidden="true"></div>
+
+    <!-- Lottie container -->
+    <div class="illustration" aria-hidden="true">
+      <div id="lottieBox" role="img" aria-label="Animated illustration"></div>
+    </div>
+
+    <!-- login card -->
+    <div class="card" role="region" aria-label="Login card">
+      <div style="display:flex;align-items:center;justify-content:space-between;">
+        <div>
+          <div class="tabs" role="tablist" aria-label="User type">
+            <button class="tab active" data-type="student" role="tab" aria-selected="true">Student</button>
+            <button class="tab" data-type="teacher" role="tab" aria-selected="false">Teacher</button>
+          </div>
+          <div style="display:flex;align-items:center;gap:10px;margin-top:6px;">
+            <div class="title">Log in</div>
+            <div class="subtitle small">Enter your credentials</div>
+          </div>
+        </div>
+        <div class="small" style="color:var(--muted);font-weight:600;">MyCollege</div>
+      </div>
+
+      <!-- NOTE: The form toggles fields depending on the selected tab (student uses username) -->
+      <form id="loginForm" autocomplete="on" aria-label="Login form">
+        <!-- username (student) or email (teacher) -->
+        <div id="field-username">
+          <label for="username">Username (Student)</label>
+          <input id="username" type="text" placeholder="e.g. 25am1234" />
+          <div class="small" style="margin-top:6px;">Student usernames must start with <code>25am</code> followed by
+            1–62 digits.</div>
+        </div>
+
+        <div id="field-email" style="display:none;">
+          <label for="email">Email (Teacher)</label>
+          <input id="email" type="email" placeholder="you@college.edu" />
+        </div>
+
+        <div>
+          <label for="password">Password</label>
+          <input id="password" type="password" placeholder="Password" />
+        </div>
+
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <div class="small"><input id="remember" type="checkbox"
+              style="transform:scale(1.05);margin-right:6px;" />Remember</div>
+          <div class="forgot" id="forgotBtn">Forgot?</div>
+        </div>
+
+        <div class="divider"></div>
+
+        <button class="btn" type="submit">Log in</button>
+        <div class="error" id="err"></div>
+        <div class="ok" id="ok">Success! Redirecting…</div>
+
+        <div style="display:flex;justify-content:center;margin-top:8px;">
+          <div class="small">New here? <strong style="color:var(--accent);margin-left:6px;cursor:pointer">Sign
+              up</strong></div>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    /* ========== Lottie init ========== */
+    const defaultLottieURL = 'https://assets9.lottiefiles.com/packages/lf20_tfb3estd.json';
+    function initLottie(path = defaultLottieURL) {
+      if (!window.lottie) { console.error('Lottie library not loaded.'); return; }
+      if (window.currentLottie) { try { window.currentLottie.destroy(); } catch (e) { } window.currentLottie = null; }
+      window.currentLottie = lottie.loadAnimation({
+        container: document.getElementById('lottieBox'),
+        renderer: 'svg',
+        loop: true,
+        autoplay: true,
+        path: path
+      });
+      window.currentLottie.addEventListener('DOMLoaded', () => {
+        try {
+          const svg = document.getElementById('lottieBox').querySelector('svg');
+          if (svg) { svg.setAttribute('role', 'img'); svg.setAttribute('aria-label', 'Animated school illustration'); }
+        } catch (e) { }
+      });
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      initLottie();
+
+      // Tabs behavior (student/teacher) toggles inputs
+      const tabs = document.querySelectorAll('.tab');
+      const fieldUsername = document.getElementById('field-username');
+      const fieldEmail = document.getElementById('field-email');
+
+      tabs.forEach(t => {
+        t.addEventListener('click', () => {
+          tabs.forEach(x => { x.classList.remove('active'); x.setAttribute('aria-selected', 'false'); });
+          t.classList.add('active'); t.setAttribute('aria-selected', 'true');
+
+          if (t.dataset.type === 'teacher') {
+            fieldUsername.style.display = 'none';
+            fieldEmail.style.display = 'block';
+            // swap animation optionally
+            initLottie('https://assets7.lottiefiles.com/packages/lf20_x62chJ.json');
+          } else {
+            fieldUsername.style.display = 'block';
+            fieldEmail.style.display = 'none';
+            initLottie(defaultLottieURL);
+          }
+        });
+      });
+
+      // Validation & login behavior
+      const form = document.getElementById('loginForm');
+      const err = document.getElementById('err');
+      const ok = document.getElementById('ok');
+
+      // username rule: 25am followed by 1-62 digits
+      const studentUsernameRegex = /^25am\d{1,62}$/;
+
+      form.addEventListener('submit', (e) => {
+        e.preventDefault();
+        err.style.display = 'none';
+        ok.style.display = 'none';
+
+        const activeTab = document.querySelector('.tab.active').dataset.type;
+
+        const password = document.getElementById('password').value || '';
+        if (password.length < 1) {
+          err.innerText = 'Password is required.'; err.style.display = 'block'; return;
+        }
+
+        if (activeTab === 'student') {
+          const username = (document.getElementById('username').value || '').trim();
+          if (!studentUsernameRegex.test(username)) {
+            err.innerText = 'Invalid student username. Example: 25am1234 (1–62 digits after 25am).';
+            err.style.display = 'block';
+            return;
+          }
+
+          // success: mark session and redirect to student.html
+          sessionStorage.setItem('student_logged_in', 'true');
+          sessionStorage.setItem('student_username', username);
+          sessionStorage.setItem('role', 'student');
+
+          ok.innerText = 'Welcome student — redirecting to dashboard…';
+          ok.style.display = 'block';
+          setTimeout(() => { window.location.href = '/student'; }, 900);
+
+        } else {
+          // Teacher flow (simple demo: require email syntax)
+          const email = (document.getElementById('email').value || '').trim();
+          if (!email || !/^\S+@\S+\.\S+$/.test(email)) {
+            err.innerText = 'Please enter a valid email address for teacher login.'; err.style.display = 'block'; return;
+          }
+
+          // mark teacher session and redirect to teacher dashboard (change as needed)
+          sessionStorage.setItem('teacher_logged_in', 'true');
+          sessionStorage.setItem('teacher_email', email);
+          sessionStorage.setItem('role', 'teacher');
+
+          ok.innerText = 'Welcome teacher — redirecting…';
+          ok.style.display = 'block';
+          setTimeout(() => { window.location.href = '/admin'; }, 900);
+        }
+      });
+
+      document.getElementById('forgotBtn').addEventListener('click', () => { alert('Password recovery flow — implement backend or modal here.'); });
+    });
+  </script>
+
+</body>
+
+</html>

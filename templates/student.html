@@ -1,101 +1,442 @@
-{% extends "base.html" %}
+<!doctype html>
+<html lang="en">
 
-{% block content %}
-<div class="glass-card" style="max-width: 600px; margin: 0 auto;">
-    <h1>Student Portal</h1>
-
-    <form id="leaveForm">
-        <div class="form-group">
-            <label for="name">Full Name</label>
-            <input type="text" id="name" required placeholder="Enter your name">
-        </div>
-
-        <div class="form-group">
-            <label for="roll_no">Roll Number</label>
-            <input type="text" id="roll_no" required placeholder="Ex: 21CSE001">
-        </div>
-
-        <div class="form-group">
-            <label for="date">Date of Leave</label>
-            <input type="date" id="date" required>
-        </div>
-
-        <div class="form-group">
-            <label for="reason">Reason for Leave</label>
-            <textarea id="reason" rows="3" required placeholder="Briefly explain the reason..."></textarea>
-        </div>
-
-        <button type="submit" id="submitBtn">Submit Leave Request</button>
-    </form>
-
-    <div id="resultArea" class="hidden"
-        style="margin-top: 2rem; border-top: 1px solid var(--glass-border); padding-top: 2rem;">
-        <h2>Updated Status</h2>
-        <div class="status-grid">
-            <div class="status-card">
-                <div class="status-value" id="attendanceValue">--%</div>
-                <div class="status-label">Current Attendance</div>
-            </div>
-            <div class="status-card">
-                <div class="status-value" id="leaveDateValue"
-                    style="font-size: 1.2rem; display: flex; align-items: center; justify-content: center; height: 38px;">
-                    --</div>
-                <div class="status-label">Last Leave Date</div>
-            </div>
-        </div>
-        <p id="message" style="margin-top: 1rem; text-align: center; color: var(--success);"></p>
-    </div>
-</div>
-
-<script>
-    document.getElementById('leaveForm').addEventListener('submit', async function (e) {
-        e.preventDefault();
-
-        const btn = document.getElementById('submitBtn');
-        const originalText = btn.innerText;
-        btn.innerText = 'Submitting...';
-        btn.disabled = true;
-
-        const data = {
-            name: document.getElementById('name').value,
-            roll_no: document.getElementById('roll_no').value,
-            date: document.getElementById('date').value,
-            reason: document.getElementById('reason').value
-        };
-
-        try {
-            const response = await fetch('/api/submit_leave', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(data)
-            });
-
-            const result = await response.json();
-
-            if (response.ok) {
-                document.getElementById('resultArea').classList.remove('hidden');
-                document.getElementById('attendanceValue').innerText = result.new_attendance_percentage + '%';
-                document.getElementById('leaveDateValue').innerText = result.last_leave_date;
-                document.getElementById('message').innerText = result.message;
-                document.getElementById('message').style.color = 'var(--success)';
-            } else {
-                document.getElementById('resultArea').classList.remove('hidden');
-                document.getElementById('attendanceValue').innerText = '--';
-                document.getElementById('leaveDateValue').innerText = '--';
-                document.getElementById('message').innerText = result.error || 'Something went wrong';
-                document.getElementById('message').style.color = 'var(--error)';
-            }
-        } catch (error) {
-            console.error('Error:', error);
-            document.getElementById('resultArea').classList.remove('hidden');
-            document.getElementById('message').innerText = 'Failed to connect to the server. Please check your connection.';
-            document.getElementById('message').style.color = 'var(--error)';
-        } finally {
-            btn.innerText = originalText;
-            btn.disabled = false;
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Student Dashboard</title>
+    <style>
+        :root {
+            --accent: #0b8457;
+            --muted: #6b7280;
+            --card-bg: #fff;
+            --page-bg: #f4f7fb;
+            --border: #d4d9e0;
         }
-    });
-</script>
-{% endblock %}
+
+        * {
+            box-sizing: border-box
+        }
+
+        body {
+            margin: 0;
+            font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+            background: linear-gradient(180deg, #f7fbfa 0%, #eef6f1 100%);
+            color: #0f1724;
+            min-height: 100vh;
+            padding: 28px;
+        }
+
+        .wrap {
+            max-width: 920px;
+            margin: 0 auto;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 18px;
+        }
+
+        header h1 {
+            font-size: 20px;
+            margin: 0;
+        }
+
+        .username {
+            color: var(--muted);
+            font-size: 14px;
+        }
+
+        .card {
+            background: var(--card-bg);
+            padding: 18px;
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(12, 18, 28, 0.06);
+            border: 1px solid var(--border);
+            margin-bottom: 18px;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            align-items: start;
+        }
+
+        label {
+            display: block;
+            font-size: 13px;
+            color: var(--muted);
+            margin-bottom: 6px;
+        }
+
+        input[type="text"],
+        input[type="date"],
+        input[type="number"],
+        textarea {
+            width: 100%;
+            padding: 10px 12px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            background: white;
+            font-size: 14px;
+        }
+
+        input[readonly] {
+            background: #f7f7f9;
+        }
+
+        .muted {
+            color: var(--muted);
+            font-size: 13px;
+        }
+
+        button {
+            padding: 10px 14px;
+            border-radius: 8px;
+            border: none;
+            cursor: pointer;
+            font-weight: 600;
+        }
+
+        .btn-primary {
+            background: var(--accent);
+            color: white;
+            box-shadow: 0 8px 22px rgba(11, 132, 87, 0.12);
+        }
+
+        .btn-ghost {
+            background: transparent;
+            border: 1px solid var(--border);
+            color: var(--muted);
+        }
+
+        .status-grid {
+            display: flex;
+            gap: 12px;
+            margin-top: 12px;
+            flex-wrap: wrap;
+        }
+
+        .status-card {
+            flex: 1;
+            min-width: 160px;
+            background: #f9fffb;
+            padding: 12px;
+            border-radius: 8px;
+            border: 1px solid rgba(11, 132, 87, 0.06);
+        }
+
+        .status-value {
+            font-weight: 700;
+            font-size: 20px;
+            color: #063b2e;
+        }
+
+        .history {
+            margin-top: 12px;
+            max-height: 220px;
+            overflow: auto;
+            border-radius: 8px;
+            border: 1px dashed #e6ece6;
+            padding: 8px;
+            background: #ffffff;
+        }
+
+        .row {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        @media (max-width:760px) {
+            .grid {
+                grid-template-columns: 1fr;
+            }
+
+            .status-grid {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="wrap">
+        <header>
+            <div>
+                <h1>Student Dashboard</h1>
+                <div class="username">Logged in as: <span id="loggedUser">—</span></div>
+            </div>
+            <div class="row">
+                <button id="logoutBtn" class="btn-ghost">Logout</button>
+            </div>
+        </header>
+
+        <section class="card" aria-labelledby="attendanceTitle">
+            <h2 id="attendanceTitle" style="margin:0 0 10px 0;">Record Today's Attendance / Leave</h2>
+
+            <form id="leaveForm">
+                <div class="grid">
+                    <div>
+                        <label for="roll">Roll Number</label>
+                        <input id="roll" type="text" placeholder="e.g. 21CSE001" required />
+                    </div>
+
+                    <div>
+                        <label for="name">Full Name</label>
+                        <input id="name" type="text" placeholder="Your full name" required />
+                    </div>
+                </div>
+
+                <div class="grid" style="margin-top:10px;">
+                    <div>
+                        <label for="date">Date of absent / today</label>
+                        <input id="date" type="date" required />
+                    </div>
+
+                    <div>
+                        <label for="total_sessions">Total sessions (today)</label>
+                        <input id="total_sessions" type="number" min="1" value="6" readonly />
+                    </div>
+                </div>
+
+                <div class="grid" style="margin-top:10px;">
+                    <div>
+                        <label for="attended">Attended today (out of 6)</label>
+                        <input id="attended" type="number" min="0" max="6" value="6" required />
+                        <div class="muted" style="margin-top:6px;">Enter how many sessions you attended today (0–6).
+                        </div>
+                    </div>
+
+                    <div>
+                        <label for="reason">Reason (if absent)</label>
+                        <textarea id="reason" rows="3"
+                            placeholder="If you were absent for any session, give a short reason"></textarea>
+                    </div>
+                </div>
+
+                <div style="margin-top:12px; display:flex; gap:8px; align-items:center;">
+                    <button type="submit" class="btn-primary">Save & Calculate</button>
+                    <button type="button" id="clearBtn" class="btn-ghost">Clear Form</button>
+                </div>
+            </form>
+
+            <div id="resultArea" style="margin-top:14px; display:none;">
+                <h3 style="margin:0 0 10px 0;">Today's Summary</h3>
+
+                <div class="status-grid">
+                    <div class="status-card">
+                        <div class="muted">Attended / Total</div>
+                        <div class="status-value" id="attendedDisplay">-- / --</div>
+                    </div>
+
+                    <div class="status-card">
+                        <div class="muted">Absent (today)</div>
+                        <div class="status-value" id="absentDisplay">--</div>
+                    </div>
+
+                    <div class="status-card">
+                        <div class="muted">Attendance % (today)</div>
+                        <div class="status-value" id="percentDisplay">--%</div>
+                    </div>
+
+                    <div class="status-card">
+                        <div class="muted">Last leave</div>
+                        <div style="font-weight:700;color:#0b8457" id="lastLeaveDisplay">--</div>
+                        <div class="muted" id="lastReasonDisplay" style="font-size:13px;margin-top:6px">—</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="card">
+            <h3 style="margin-top:0">Leave History (this roll)</h3>
+            <div class="history" id="historyBox">No records yet.</div>
+        </section>
+    </div>
+
+    <script>
+        // redirect to login if not logged in as student
+        (function authCheck() {
+            const role = sessionStorage.getItem('role');
+            const logged = sessionStorage.getItem('student_logged_in');
+            if (!(logged === 'true' && role === 'student')) {
+                // not logged in as student — redirect to login
+                window.location.href = "/login";
+            }
+        })();
+
+        // helper: save leave record to localStorage under key 'leaves_<roll>'
+        function saveLeaveRecord(roll, record) {
+            const key = 'leaves_' + roll;
+            const raw = localStorage.getItem(key);
+            const arr = raw ? JSON.parse(raw) : [];
+            arr.push(record);
+            localStorage.setItem(key, JSON.stringify(arr));
+        }
+
+        // helper: get all records
+        function getLeaveRecords(roll) {
+            const key = 'leaves_' + roll;
+            const raw = localStorage.getItem(key);
+            return raw ? JSON.parse(raw) : [];
+        }
+
+        // helper: last leave (most recent based on timestamp)
+        function getLastLeave(roll) {
+            const recs = getLeaveRecords(roll);
+            if (!recs.length) return null;
+            recs.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+            return recs[0];
+        }
+
+        // populate logged in username
+        document.getElementById('loggedUser').innerText = sessionStorage.getItem('student_username') || 'student';
+
+        // set date default to today
+        const dateEl = document.getElementById('date');
+        const todayISO = new Date().toISOString().slice(0, 10);
+        dateEl.value = todayISO;
+
+        // form handling
+        const form = document.getElementById('leaveForm');
+        const resultArea = document.getElementById('resultArea');
+        const attendedDisplay = document.getElementById('attendedDisplay');
+        const absentDisplay = document.getElementById('absentDisplay');
+        const percentDisplay = document.getElementById('percentDisplay');
+        const lastLeaveDisplay = document.getElementById('lastLeaveDisplay');
+        const lastReasonDisplay = document.getElementById('lastReasonDisplay');
+        const historyBox = document.getElementById('historyBox');
+
+        // initialize history if roll present in sessionStorage
+        const savedRoll = sessionStorage.getItem('student_roll_no');
+        if (savedRoll) {
+            document.getElementById('roll').value = savedRoll;
+            populateHistory(savedRoll);
+        }
+
+        function populateHistory(roll) {
+            const recs = getLeaveRecords(roll);
+            if (!recs.length) {
+                historyBox.innerHTML = '<div class="muted">No records yet for this roll.</div>';
+                lastLeaveDisplay.innerText = '--';
+                lastReasonDisplay.innerText = '';
+                return;
+            }
+            recs.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+            // show last leave
+            const last = recs[0];
+            lastLeaveDisplay.innerText = last.date || last.timestamp.split('T')[0];
+            lastReasonDisplay.innerText = last.reason ? ('Reason: ' + last.reason) : '—';
+
+            // history list
+            historyBox.innerHTML = '';
+            recs.forEach(r => {
+                const d = document.createElement('div');
+                d.style.padding = '8px';
+                d.style.borderBottom = '1px solid #f1f5f3';
+                d.innerHTML = `
+        <div style="font-weight:700">${r.date || r.timestamp.split('T')[0]} — Attended: ${r.attended}/${r.total_classes} — Absent: ${r.absent}</div>
+        <div class="muted" style="font-size:13px;margin-top:6px">${r.reason ? 'Reason: ' + r.reason : 'No reason provided'}</div>
+      `;
+                historyBox.appendChild(d);
+            });
+        }
+
+        form.addEventListener('submit', (e) => {
+            e.preventDefault();
+
+            const roll = document.getElementById('roll').value.trim();
+            const name = document.getElementById('name').value.trim();
+            const date = document.getElementById('date').value;
+            const total = Number(document.getElementById('total_sessions').value) || 6;
+            const attended = Number(document.getElementById('attended').value);
+            const reason = document.getElementById('reason').value.trim();
+
+            if (!roll || !name || !date) {
+                alert('Please fill roll number, name and date.');
+                return;
+            }
+            if (isNaN(attended) || attended < 0 || attended > total) {
+                alert('Attended must be between 0 and ' + total);
+                return;
+            }
+
+            const absent = Math.max(0, total - attended);
+            const percentToday = Math.round((attended / total) * 100 * 100) / 100; // two decimals
+
+            // record structure
+            const record = {
+                roll_no: roll,
+                name,
+                date,
+                total_classes: total,
+                attended,
+                absent,
+                reason,
+                timestamp: new Date().toISOString()
+            };
+
+            // save to localStorage
+            saveLeaveRecord(roll, record);
+
+            // persist roll for convenience
+            sessionStorage.setItem('student_roll_no', roll);
+
+            // update UI
+            attendedDisplay.innerText = attended + ' / ' + total;
+            absentDisplay.innerText = absent;
+            percentDisplay.innerText = percentToday + '%';
+
+            resultArea.style.display = 'block';
+
+            // show last leave info (excluding today's record if you want)
+            const last = getLastLeave(roll);
+            if (last) {
+                lastLeaveDisplay.innerText = last.date || last.timestamp.split('T')[0];
+                lastReasonDisplay.innerText = last.reason ? ('Reason: ' + last.reason) : '—';
+            } else {
+                lastLeaveDisplay.innerText = '--';
+                lastReasonDisplay.innerText = '';
+            }
+
+            // refresh history
+            populateHistory(roll);
+        });
+
+        // clear form
+        document.getElementById('clearBtn').addEventListener('click', () => {
+            document.getElementById('attended').value = 6;
+            document.getElementById('reason').value = '';
+        });
+
+        // logout
+        document.getElementById('logoutBtn').addEventListener('click', () => {
+            sessionStorage.removeItem('student_logged_in');
+            sessionStorage.removeItem('student_username');
+            sessionStorage.removeItem('role');
+            // optionally keep student_roll_no; comment next line if you want to keep it
+            // sessionStorage.removeItem('student_roll_no');
+            window.location.href = 'login.html';
+        });
+
+        // If roll field changed, update history
+        document.getElementById('roll').addEventListener('change', (e) => {
+            const r = e.target.value.trim();
+            if (r) populateHistory(r);
+        });
+
+        // On load, if roll present, compute last leave and hide section until user submits
+        document.addEventListener('DOMContentLoaded', () => {
+            const r = document.getElementById('roll').value.trim();
+            if (r) populateHistory(r);
+        });
+
+    </script>
+</body>
+
+</html>
