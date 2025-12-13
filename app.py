@@ -36,9 +36,10 @@ if users.count_documents({"role": "admin"}) == 0:
     })
 
 # ===================== AUTH =====================
-@app.route("/")
+@app.route("/", methods=["GET", "HEAD"])
 def home():
-    return redirect("/login")
+    return redirect("/login", code=302)
+
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
