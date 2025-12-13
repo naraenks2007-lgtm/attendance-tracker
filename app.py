@@ -4,18 +4,18 @@ from flask import (
 )
 from pymongo import MongoClient
 from bson.objectid import ObjectId
-from datetime import date
+from datetime import date, datetime, timedelta
+from werkzeug.security import generate_password_hash, check_password_hash
 import os, re, io
 
 # ===================== APP =====================
 app = Flask(__name__)
-app.secret_key = "your_secret_key_here"
+app.secret_key = os.environ.get("SECRET_KEY", "dev-secret")
 
 # ===================== MONGODB =====================
-MONGO_URI = os.environ.get(
-    "MONGO_URI",
-    "mongodb+srv://naraenks2007_db_user:naraen2007@cluster0.fx8z7bx.mongodb.net/attendance_db"
-)
+MONGO_URI = os.environ.get("MONGO_URI")
+if not MONGO_URI:
+    raise Exception("MONGO_URI environment variable not set")
 
 client = MongoClient(MONGO_URI)
 db = client["attendance_db"]
@@ -27,13 +27,12 @@ records = db["records"]
 STUDENT_REGEX = r'^25am(0[0-5][0-9]|06[0-2])$'
 TOTAL_SESSIONS_PER_DAY = 6
 
-# ===================== CREATE ADMIN =====================
-if not users.find_one({"username": "admin"}):
+# ===================== CREATE ADMIN (ONCE) =====================
+if users.count_documents({"role": "admin"}) == 0:
     users.insert_one({
         "username": "admin",
-        "password": "admin123",
-        "role": "admin",
-        "name": "Administrator"
+        "password": generate_password_hash("admin123"),
+        "role": "admin"
     })
 
 # ===================== AUTH =====================
@@ -47,19 +46,20 @@ def login():
         username = request.form["username"]
         password = request.form["password"]
 
-        # Admin or existing user
-        user = users.find_one({"username": username, "password": password})
-        if user:
+        user = users.find_one({"username": username})
+
+        # ----- ADMIN / EXISTING USER -----
+        if user and check_password_hash(user["password"], password):
             session["user"] = username
             session["role"] = user["role"]
             return redirect("/admin" if user["role"] == "admin" else "/student")
 
-        # Student auto-register
+        # ----- STUDENT AUTO REGISTER -----
         if re.match(STUDENT_REGEX, username) and password == "12345":
-            if not users.find_one({"username": username}):
+            if not user:
                 users.insert_one({
                     "username": username,
-                    "password": "12345",
+                    "password": generate_password_hash("12345"),
                     "role": "student",
                     "name": "Student"
                 })
@@ -91,6 +91,14 @@ def student():
         reason = request.form["reason"]
         leave_date = request.form["date"]
 
+        # validation
+        if absent < 0 or absent > TOTAL_SESSIONS_PER_DAY:
+            return redirect("/student")
+
+        # prevent duplicate leave for same date
+        if records.find_one({"username": session["user"], "date": leave_date}):
+            return redirect("/student")
+
         users.update_one(
             {"username": session["user"]},
             {"$set": {"name": name}}
@@ -108,18 +116,18 @@ def student():
 
         return redirect("/student")
 
-    # ---------- ATTENDANCE CALC (APPROVED ONLY) ----------
+    # ---------- ATTENDANCE CALC ----------
     approved = list(records.find({
         "username": session["user"],
         "status": "Approved"
     }))
 
-    total_sessions = len(approved) * TOTAL_SESSIONS_PER_DAY
+    total_possible = len(approved) * TOTAL_SESSIONS_PER_DAY
     total_absent = sum(r["absent_sessions"] for r in approved)
 
     attendance = round(
-        ((total_sessions - total_absent) / total_sessions) * 100, 2
-    ) if total_sessions > 0 else 100
+        ((total_possible - total_absent) / total_possible) * 100, 2
+    ) if total_possible > 0 else 100
 
     latest = records.find_one(
         {"username": session["user"]},
@@ -192,27 +200,17 @@ def admin_action(id, action):
 
     return redirect("/admin")
 
-# ===================== ADMIN GRAPH =====================
-from datetime import datetime, timedelta
-
+# ===================== ADMIN STATS =====================
 @app.route("/admin/stats")
 def admin_stats():
     filter_type = request.args.get("type", "week")
     today = datetime.today()
 
     if filter_type == "today":
-        start = today.strftime("%Y-%m-%d")
-        match = {"date": start, "status": "Approved"}
-
-    elif filter_type == "month":
-        start_date = today - timedelta(days=30)
-        match = {
-            "status": "Approved",
-            "date": {"$gte": start_date.strftime("%Y-%m-%d")}
-        }
-
-    else:  # week (default)
-        start_date = today - timedelta(days=7)
+        match = {"date": today.strftime("%Y-%m-%d"), "status": "Approved"}
+    else:
+        days = 30 if filter_type == "month" else 7
+        start_date = today - timedelta(days=days)
         match = {
             "status": "Approved",
             "date": {"$gte": start_date.strftime("%Y-%m-%d")}
@@ -220,10 +218,7 @@ def admin_stats():
 
     pipeline = [
         {"$match": match},
-        {"$group": {
-            "_id": "$date",
-            "absent": {"$sum": "$absent_sessions"}
-        }},
+        {"$group": {"_id": "$date", "absent": {"$sum": "$absent_sessions"}}},
         {"$sort": {"_id": 1}}
     ]
 
@@ -233,7 +228,6 @@ def admin_stats():
         "labels": [d["_id"] for d in data],
         "data": [d["absent"] for d in data]
     })
-
 
 # ===================== ADMIN PDF =====================
 @app.route("/admin/pdf")
@@ -260,8 +254,8 @@ def admin_pdf():
 
     table = Table(data)
     table.setStyle(TableStyle([
-        ("BACKGROUND", (0,0), (-1,0), colors.lightgrey),
-        ("GRID", (0,0), (-1,-1), 1, colors.black)
+        ("BACKGROUND", (0, 0), (-1, 0), colors.lightgrey),
+        ("GRID", (0, 0), (-1, -1), 1, colors.black)
     ]))
 
     doc.build([table])

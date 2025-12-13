@@ -2,3 +2,5 @@ Flask
 pymongo
 dnspython
 gunicorn
+reportlab
+werkzeug
