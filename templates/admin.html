@@ -1,49 +1,129 @@
-<!doctype html>
-<html lang="en">
+<!DOCTYPE html>
+<html>
 
 <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Admin Dashboard</title>
 
-    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='styles.responsive.css') }}">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 
 <body>
-    <div class="wrap">
-        <header> ... </header>
 
-        <div class="card">
-            <!-- filters and controls -->
+    <div class="dashboard-container">
+
+        <div class="header">
+            <h2>Admin Dashboard</h2>
+            <a href="/logout">Logout</a>
         </div>
 
-        <!-- make table responsive -->
-        <div class="card table-responsive">
-            <table class="responsive-table" id="recordsTable">
-                <thead>
-                    <tr>
-                        <th>Date</th>
-                        <th>Roll No</th>
-                        <th>Name</th>
-                        <th>Attended</th>
-                        <th>Absent</th>
-                        <th>Reason</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody id="recordsBody"></tbody>
-            </table>
+        <!-- Stats -->
+        <div class="stats-grid">
+            <div class="card">
+                <h3>Total Absentees Today</h3>
+                <div class="value">{{ today_absent }}</div>
+            </div>
         </div>
 
-        <!-- rest remains -->
+        <!-- Search Filters -->
+        <div class="form-card">
+            <input type="text" id="searchName" placeholder="Search by Name">
+            <input type="text" id="searchRoll" placeholder="Search by Roll No">
+            <input type="date" id="searchDate">
+        </div>
+
+        <!-- Table -->
+        <table id="adminTable">
+            <tr>
+                <th>Roll</th>
+                <th>Name</th>
+                <th>Date</th>
+                <th>Absent</th>
+                <th>Status</th>
+                <th>Action</th>
+            </tr>
+            {% for r in leaves %}
+            <tr>
+                <td>{{ r.roll }}</td>
+                <td>{{ r.name }}</td>
+                <td>{{ r.date }}</td>
+                <td>{{ r.absent_sessions }}</td>
+                <td class="status-{{ r.status|lower }}">{{ r.status }}</td>
+                <td>
+                    <a href="/admin/action/{{ r._id }}/approve">Approve</a>
+                    <a href="/admin/action/{{ r._id }}/reject">Reject</a>
+                    <a href="/admin/action/{{ r._id }}/delete">Delete</a>
+                </td>
+            </tr>
+            {% endfor %}
+        </table>
+
+        <br>
+
+        <!-- Graph Controls -->
+        <div class="form-card">
+            <button onclick="loadGraph('today')">Today</button>
+            <button onclick="loadGraph('week')">This Week</button>
+            <button onclick="loadGraph('month')">This Month</button>
+            <a href="/admin/pdf"><button>Download PDF</button></a>
+        </div>
+
+        <canvas id="chart" height="100"></canvas>
+
     </div>
 
     <script>
-        // existing JS unchanged
+        const nameInput = document.getElementById("searchName");
+        const rollInput = document.getElementById("searchRoll");
+        const dateInput = document.getElementById("searchDate");
+
+        [nameInput, rollInput, dateInput].forEach(el => {
+            el.addEventListener("input", filterTable);
+        });
+
+        function filterTable() {
+            const name = nameInput.value.toUpperCase();
+            const roll = rollInput.value.toUpperCase();
+            const date = dateInput.value;
+
+            document.querySelectorAll("#adminTable tr").forEach((row, i) => {
+                if (i === 0) return;
+
+                const tds = row.getElementsByTagName("td");
+                const rowRoll = tds[0].innerText.toUpperCase();
+                const rowName = tds[1].innerText.toUpperCase();
+                const rowDate = tds[2].innerText;
+
+                row.style.display =
+                    (rowName.includes(name)) &&
+                        (rowRoll.includes(roll)) &&
+                        (!date || rowDate === date)
+                        ? ""
+                        : "none";
+            });
+        }
+
+        let chart;
+        function loadGraph(type) {
+            fetch(`/admin/stats?type=${type}`)
+                .then(res => res.json())
+                .then(data => {
+                    if (chart) chart.destroy();
+                    chart = new Chart(document.getElementById("chart"), {
+                        type: "bar",
+                        data: {
+                            labels: data.labels,
+                            datasets: [{
+                                label: "Absent Sessions",
+                                data: data.data
+                            }]
+                        }
+                    });
+                });
+        }
     </script>
+
 </body>
 
 </html>

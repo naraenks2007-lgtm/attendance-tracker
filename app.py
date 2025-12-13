@@ -1,160 +1,279 @@
-from flask import Flask, render_template, request, jsonify
-from datetime import datetime
-import sqlite3
-import os
+from flask import (
+    Flask, render_template, request,
+    redirect, session, jsonify, send_file
+)
+from pymongo import MongoClient
+from bson.objectid import ObjectId
+from datetime import date
+import os, re, io
 
+# ===================== APP =====================
 app = Flask(__name__)
+app.secret_key = "your_secret_key_here"
 
-DB_NAME = "leave_records.db"
+# ===================== MONGODB =====================
+MONGO_URI = os.environ.get(
+    "MONGO_URI",
+    "mongodb+srv://naraenks2007_db_user:naraen2007@cluster0.fx8z7bx.mongodb.net/attendance_db"
+)
 
-# ========= DB HELPER FUNCTIONS =========
-def init_db():
-    """Create the database and table if it doesn't exist. Also add extra columns if missing."""
-    conn = sqlite3.connect(DB_NAME)
-    cur = conn.cursor()
-    # Create base table (new installs will include the extra columns below)
-    cur.execute("""
-        CREATE TABLE IF NOT EXISTS records (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT,
-            roll_no TEXT,
-            date TEXT,
-            reason TEXT,
-            timestamp TEXT
-        )
-    """)
-    conn.commit()
+client = MongoClient(MONGO_URI)
+db = client["attendance_db"]
 
-    # Check existing columns and add any missing ones
-    cur.execute("PRAGMA table_info(records)")
-    cols = [r[1] for r in cur.fetchall()]  # second column is name
-    # desired additional columns
-    extras = {
-        "total_classes": "INTEGER",
-        "leaves_taken": "INTEGER",
-        "attendance": "REAL"
-    }
-    for col_name, col_type in extras.items():
-        if col_name not in cols:
-            cur.execute(f"ALTER TABLE records ADD COLUMN {col_name} {col_type}")
-    conn.commit()
-    conn.close()
+users = db["users"]
+records = db["records"]
 
+# ===================== CONSTANTS =====================
+STUDENT_REGEX = r'^25am(0[0-5][0-9]|06[0-2])$'
+TOTAL_SESSIONS_PER_DAY = 6
 
-def get_all_records():
-    conn = sqlite3.connect(DB_NAME)
-    conn.row_factory = sqlite3.Row
-    cur = conn.cursor()
-    # select additional fields if present
-    cur.execute("""
-        SELECT name, roll_no, date, reason, timestamp,
-               total_classes, leaves_taken, attendance
-        FROM records
-        ORDER BY id DESC
-    """)
-    rows = cur.fetchall()
-    conn.close()
+# ===================== CREATE ADMIN =====================
+if not users.find_one({"username": "admin"}):
+    users.insert_one({
+        "username": "admin",
+        "password": "admin123",
+        "role": "admin",
+        "name": "Administrator"
+    })
 
-    records = []
-    for row in rows:
-        records.append({
-            "name": row["name"],
-            "roll_no": row["roll_no"],
-            "date": row["date"],
-            "reason": row["reason"],
-            "timestamp": row["timestamp"],
-            "total_classes": row["total_classes"],
-            "leaves_taken": row["leaves_taken"],
-            "attendance": row["attendance"]
-        })
-    return records
-
-
-def add_record(name, roll_no, date, reason, total_classes=None, leaves_taken=None, attendance=None):
-    conn = sqlite3.connect(DB_NAME)
-    cur = conn.cursor()
-    cur.execute(
-        """
-        INSERT INTO records
-            (name, roll_no, date, reason, timestamp, total_classes, leaves_taken, attendance)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        """,
-        (name, roll_no, date, reason, datetime.now().isoformat(), total_classes, leaves_taken, attendance)
-    )
-    conn.commit()
-    conn.close()
-
-
-# ========= PAGES =========
+# ===================== AUTH =====================
 @app.route("/")
 def home():
+    return redirect("/login")
+
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    if request.method == "POST":
+        username = request.form["username"]
+        password = request.form["password"]
+
+        # Admin or existing user
+        user = users.find_one({"username": username, "password": password})
+        if user:
+            session["user"] = username
+            session["role"] = user["role"]
+            return redirect("/admin" if user["role"] == "admin" else "/student")
+
+        # Student auto-register
+        if re.match(STUDENT_REGEX, username) and password == "12345":
+            if not users.find_one({"username": username}):
+                users.insert_one({
+                    "username": username,
+                    "password": "12345",
+                    "role": "student",
+                    "name": "Student"
+                })
+            session["user"] = username
+            session["role"] = "student"
+            return redirect("/student")
+
+        return render_template("login.html", error="Invalid login")
+
     return render_template("login.html")
 
-@app.route("/student")
+@app.route("/logout")
+def logout():
+    session.clear()
+    return redirect("/login")
+
+# ===================== STUDENT =====================
+@app.route("/student", methods=["GET", "POST"])
 def student():
-    return render_template("student.html")
+    if "user" not in session or session["role"] != "student":
+        return redirect("/login")
 
+    today = date.today().strftime("%Y-%m-%d")
 
+    # ---------- SUBMIT LEAVE ----------
+    if request.method == "POST":
+        name = request.form["student_name"]
+        absent = int(request.form["absent_sessions"])
+        reason = request.form["reason"]
+        leave_date = request.form["date"]
+
+        users.update_one(
+            {"username": session["user"]},
+            {"$set": {"name": name}}
+        )
+
+        records.insert_one({
+            "username": session["user"],
+            "name": name,
+            "roll": session["user"],
+            "date": leave_date,
+            "absent_sessions": absent,
+            "reason": reason,
+            "status": "Pending"
+        })
+
+        return redirect("/student")
+
+    # ---------- ATTENDANCE CALC (APPROVED ONLY) ----------
+    approved = list(records.find({
+        "username": session["user"],
+        "status": "Approved"
+    }))
+
+    total_sessions = len(approved) * TOTAL_SESSIONS_PER_DAY
+    total_absent = sum(r["absent_sessions"] for r in approved)
+
+    attendance = round(
+        ((total_sessions - total_absent) / total_sessions) * 100, 2
+    ) if total_sessions > 0 else 100
+
+    latest = records.find_one(
+        {"username": session["user"]},
+        sort=[("_id", -1)]
+    )
+
+    approval_status = latest["status"] if latest else "Not Submitted"
+    absent_today = (
+        latest["absent_sessions"]
+        if latest and latest["date"] == today
+        else 0
+    )
+    last_date = latest["date"] if latest else "None"
+
+    history = list(
+        records.find({"username": session["user"]}).sort("_id", -1)
+    )
+
+    user = users.find_one({"username": session["user"]})
+
+    return render_template(
+        "student.html",
+        name=user.get("name", "Student"),
+        roll_no=session["user"],
+        attendance=attendance,
+        absent_today=absent_today,
+        last_leave=last_date,
+        approval_status=approval_status,
+        history=history
+    )
+
+# ===================== ADMIN =====================
 @app.route("/admin")
 def admin():
-    return render_template("admin.html")
+    if "user" not in session or session["role"] != "admin":
+        return redirect("/login")
 
+    today = date.today().strftime("%Y-%m-%d")
 
-# ========= APIS =========
+    leaves = list(records.find().sort("_id", -1))
 
-@app.route("/api/submit_leave", methods=["POST"])
-def submit_leave():
-    data = request.get_json() or {}
+    today_absent = records.count_documents({
+        "date": today,
+        "status": "Approved"
+    })
 
-    name = data.get("name")
-    roll_no = data.get("roll_no")
-    date = data.get("date")
-    reason = data.get("reason")
-    total_classes = data.get("total_classes")
-    leaves_taken = data.get("leaves_taken")
+    return render_template(
+        "admin.html",
+        leaves=leaves,
+        today_absent=today_absent
+    )
 
-    # Validation
-    if not all([name, roll_no, date, reason, total_classes is not None]):
-        return jsonify({"error": "All fields are required (including total_classes)."}), 400
+@app.route("/admin/action/<id>/<action>")
+def admin_action(id, action):
+    if "user" not in session or session["role"] != "admin":
+        return redirect("/login")
 
-    # ---- REAL ATTENDANCE CALCULATION ----
-    try:
-        total = int(total_classes)
-        leaves = int(leaves_taken) if leaves_taken is not None else 0
-        present = max(0, total - leaves)
-        attendance_percent = round((present / total) * 100, 2)
-    except Exception:
-        return jsonify({"error": "Invalid number format for total_classes / leaves_taken."}), 400
+    if action == "approve":
+        records.update_one(
+            {"_id": ObjectId(id)},
+            {"$set": {"status": "Approved"}}
+        )
+    elif action == "reject":
+        records.update_one(
+            {"_id": ObjectId(id)},
+            {"$set": {"status": "Rejected"}}
+        )
+    elif action == "delete":
+        records.delete_one({"_id": ObjectId(id)})
 
-    # ---- SAVE LEAVE TO DB ----
-    add_record(name, roll_no, date, reason, total_classes=total, leaves_taken=leaves, attendance=attendance_percent)
+    return redirect("/admin")
 
-    # ---- FIND LAST LEAVE DATE FROM DB ----
-    conn = sqlite3.connect(DB_NAME)
-    cur = conn.cursor()
-    cur.execute("SELECT date FROM records WHERE roll_no=? ORDER BY id DESC LIMIT 1", (roll_no,))
-    last = cur.fetchone()
-    conn.close()
+# ===================== ADMIN GRAPH =====================
+from datetime import datetime, timedelta
 
-    last_leave_date = last[0] if last else date
+@app.route("/admin/stats")
+def admin_stats():
+    filter_type = request.args.get("type", "week")
+    today = datetime.today()
+
+    if filter_type == "today":
+        start = today.strftime("%Y-%m-%d")
+        match = {"date": start, "status": "Approved"}
+
+    elif filter_type == "month":
+        start_date = today - timedelta(days=30)
+        match = {
+            "status": "Approved",
+            "date": {"$gte": start_date.strftime("%Y-%m-%d")}
+        }
+
+    else:  # week (default)
+        start_date = today - timedelta(days=7)
+        match = {
+            "status": "Approved",
+            "date": {"$gte": start_date.strftime("%Y-%m-%d")}
+        }
+
+    pipeline = [
+        {"$match": match},
+        {"$group": {
+            "_id": "$date",
+            "absent": {"$sum": "$absent_sessions"}
+        }},
+        {"$sort": {"_id": 1}}
+    ]
+
+    data = list(records.aggregate(pipeline))
 
     return jsonify({
-        "message": "Leave submitted successfully!",
-        "new_attendance_percentage": attendance_percent,
-        "last_leave_date": last_leave_date
-    }), 200
+        "labels": [d["_id"] for d in data],
+        "data": [d["absent"] for d in data]
+    })
 
 
-@app.route("/api/records", methods=["GET"])
-def get_records_api():
-    records = get_all_records()
-    return jsonify(records), 200
+# ===================== ADMIN PDF =====================
+@app.route("/admin/pdf")
+def admin_pdf():
+    if "user" not in session or session["role"] != "admin":
+        return redirect("/login")
 
-# serve login page
-@app.route("/login")
-@app.route("/login.html")
-def login_page():
-    return render_template("login.html")
+    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle
+    from reportlab.lib.pagesizes import letter
+    from reportlab.lib import colors
+
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=letter)
+
+    data = [["Roll", "Name", "Date", "Absent", "Status"]]
+    for r in records.find():
+        data.append([
+            r.get("roll", ""),
+            r.get("name", ""),
+            r.get("date", ""),
+            r.get("absent_sessions", ""),
+            r.get("status", "")
+        ])
+
+    table = Table(data)
+    table.setStyle(TableStyle([
+        ("BACKGROUND", (0,0), (-1,0), colors.lightgrey),
+        ("GRID", (0,0), (-1,-1), 1, colors.black)
+    ]))
+
+    doc.build([table])
+    buffer.seek(0)
+
+    return send_file(
+        buffer,
+        as_attachment=True,
+        download_name="attendance_report.pdf",
+        mimetype="application/pdf"
+    )
+
+# ===================== RUN =====================
 if __name__ == "__main__":
-    init_db()  # run ONLY locally
-    app.run(debug=True)
+    app.run()

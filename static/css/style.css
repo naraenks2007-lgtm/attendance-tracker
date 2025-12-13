@@ -1,207 +1,121 @@
-:root {
-    --primary-color: #6366f1;
-    --secondary-color: #a855f7;
-    --bg-dark: #0f172a;
-    --glass-bg: rgba(30, 41, 59, 0.7);
-    --glass-border: rgba(255, 255, 255, 0.1);
-    --text-main: #f8fafc;
-    --text-muted: #94a3b8;
-    --success: #10b981;
-    --error: #ef4444;
-}
-
 * {
-    margin: 0;
-    padding: 0;
     box-sizing: border-box;
-    font-family: 'Outfit', sans-serif;
+    font-family: 'Poppins', sans-serif;
 }
 
 body {
-    background-color: var(--bg-dark);
-    color: var(--text-main);
-    min-height: 100vh;
+    background: #f4f6f9;
+    margin: 0;
+    padding: 0;
+}
+
+.dashboard-container {
+    max-width: 1100px;
+    margin: auto;
+    padding: 20px;
+}
+
+.header {
     display: flex;
-    justify-content: center;
+    justify-content: space-between;
     align-items: center;
-    overflow-x: hidden;
-}
-
-.background-animation {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    z-index: -1;
-    background: radial-gradient(circle at 10% 20%, rgba(99, 102, 241, 0.2) 0%, transparent 40%),
-                radial-gradient(circle at 90% 80%, rgba(168, 85, 247, 0.2) 0%, transparent 40%);
-    animation: pulseBackground 10s ease-in-out infinite alternate;
-}
-
-@keyframes pulseBackground {
-    0% { transform: scale(1); }
-    100% { transform: scale(1.1); }
-}
-
-.container {
-    width: 100%;
-    max-width: 1200px;
-    padding: 2rem;
-}
-
-/* Glass Card Styles */
-.glass-card {
-    background: var(--glass-bg);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    border: 1px solid var(--glass-border);
-    border-radius: 24px;
-    padding: 3rem;
-    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
-    transition: transform 0.3s ease, box-shadow 0.3s ease;
-}
-
-.glass-card:hover {
-    transform: translateY(-5px);
-    box-shadow: 0 12px 40px 0 rgba(0, 0, 0, 0.5);
-}
-
-h1, h2 {
-    margin-bottom: 1.5rem;
-    font-weight: 700;
-    background: linear-gradient(135deg, #fff 0%, #cbd5e1 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-}
-
-/* Form Elements */
-.form-group {
-    margin-bottom: 1.5rem;
-}
-
-label {
-    display: block;
-    margin-bottom: 0.5rem;
-    color: var(--text-muted);
-    font-size: 0.9rem;
-}
-
-input, textarea, select {
-    width: 100%;
-    padding: 1rem;
-    background: rgba(15, 23, 42, 0.6);
-    border: 1px solid var(--glass-border);
+    background: white;
+    padding: 20px;
     border-radius: 12px;
-    color: var(--text-main);
-    font-size: 1rem;
-    transition: border-color 0.3s ease, box-shadow 0.3s ease;
+    margin-bottom: 20px;
 }
 
-input:focus, textarea:focus {
-    outline: none;
-    border-color: var(--primary-color);
-    box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2);
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 15px;
+    margin-bottom: 25px;
+}
+
+.card {
+    background: white;
+    padding: 20px;
+    border-radius: 12px;
+    text-align: center;
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.08);
+}
+
+.card .value {
+    font-size: 1.8rem;
+    font-weight: bold;
+}
+
+.status-approved {
+    color: green;
+}
+
+.status-pending {
+    color: red;
+}
+
+.status-rejected {
+    color: orange;
+}
+
+.tabs {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 15px;
+}
+
+.tab-btn {
+    padding: 10px 20px;
+    border: none;
+    background: #ddd;
+    border-radius: 8px;
+    cursor: pointer;
+}
+
+.tab-btn.active {
+    background: #4f46e5;
+    color: white;
+}
+
+.form-card {
+    background: white;
+    padding: 25px;
+    border-radius: 12px;
+}
+
+input,
+textarea,
+button,
+select {
+    width: 100%;
+    padding: 10px;
+    margin-top: 8px;
+    margin-bottom: 15px;
 }
 
 button {
-    width: 100%;
-    padding: 1rem;
-    background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
-    border: none;
-    border-radius: 12px;
+    background: #4f46e5;
     color: white;
-    font-weight: 600;
-    font-size: 1.1rem;
+    border: none;
+    border-radius: 8px;
     cursor: pointer;
-    transition: transform 0.2s ease, opacity 0.2s ease;
-}
-
-button:hover {
-    opacity: 0.9;
-    transform: scale(1.02);
-}
-
-button:active {
-    transform: scale(0.98);
-}
-
-/* Tables */
-.table-container {
-    overflow-x: auto;
 }
 
 table {
     width: 100%;
     border-collapse: collapse;
-    margin-top: 1rem;
 }
 
-th, td {
-    padding: 1rem;
-    text-align: left;
-    border-bottom: 1px solid var(--glass-border);
-}
-
-th {
-    color: var(--text-muted);
-    font-weight: 600;
-}
-
-tr:hover td {
-    background: rgba(255, 255, 255, 0.05);
-}
-
-/* Role Selection Page */
-.role-container {
-    display: flex;
-    gap: 2rem;
-    justify-content: center;
-    flex-wrap: wrap;
-}
-
-.role-card {
-    flex: 1;
-    min-width: 300px;
-    max-width: 400px;
-    text-align: center;
-    cursor: pointer;
-    text-decoration: none;
-    color: var(--text-main);
-}
-
-.role-icon {
-    font-size: 4rem;
-    margin-bottom: 1rem;
-    display: block;
-}
-
-/* Status Cards */
-.status-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 1.5rem;
-    margin-top: 2rem;
-}
-
-.status-card {
-    background: rgba(15, 23, 42, 0.4);
-    padding: 1.5rem;
-    border-radius: 16px;
+th,
+td {
+    padding: 10px;
+    border-bottom: 1px solid #ddd;
     text-align: center;
 }
 
-.status-value {
-    font-size: 2rem;
-    font-weight: 700;
-    color: var(--primary-color);
-}
-
-.status-label {
-    color: var(--text-muted);
-    font-size: 0.9rem;
-}
-
-.hidden {
-    display: none;
+@media (max-width: 768px) {
+    .header {
+        flex-direction: column;
+        gap: 10px;
+        text-align: center;
+    }
 }

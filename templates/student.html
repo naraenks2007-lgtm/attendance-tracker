@@ -1,37 +1,86 @@
-<!doctype html>
-<html lang="en">
+<!DOCTYPE html>
+<html>
 
 <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>Animated Login — Student / Teacher</title>
-
-    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}"> <!-- your main css (if any) -->
-    <link rel="stylesheet" href="{{ url_for('static', filename='styles.responsive.css') }}">
-    <!-- responsive overrides -->
-
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/lottie-web/5.10.1/lottie.min.js" defer></script>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Student Dashboard</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 
 <body>
-    <div class="stage" aria-live="polite">
-        <div class="float-shape fs1" aria-hidden="true"></div>
-        <div class="float-shape fs2" aria-hidden="true"></div>
 
-        <div class="illustration" aria-hidden="true">
-            <div id="lottieBox" role="img" aria-label="Animated illustration"></div>
+    <div class="dashboard-container">
+
+        <div class="header">
+            <h2>{{ name }} ({{ roll_no }})</h2>
+            <a href="/logout">Logout</a>
         </div>
 
-        <div class="card" role="region" aria-label="Login card">
-            <!-- card content (same as before) -->
-            <!-- ... keep your existing login form and markup unchanged ... -->
-            <!-- Ensure buttons use classes .btn or .btn-primary so responsive CSS applies. -->
+        <div class="stats-grid">
+            <div class="card">
+                Attendance %
+                <div class="value">{{ attendance }}%</div>
+            </div>
+
+            <div class="card">
+                Absent Today
+                <div class="value">{{ absent_today }}/6</div>
+            </div>
+
+            <div class="card">
+                Last Date
+                <div class="value">{{ last_leave }}</div>
+            </div>
+
+            <div class="card">
+                Approval
+                <div class="value status-{{ approval_status|lower }}">
+                    {{ approval_status }}
+                </div>
+            </div>
         </div>
+
+        <div class="tabs">
+            <button class="tab-btn active" onclick="showTab('apply')">Apply Leave</button>
+            <button class="tab-btn" onclick="showTab('status')">Check Status</button>
+        </div>
+
+        <div id="apply" class="form-card">
+            <form method="POST">
+                <input name="student_name" placeholder="Student Name" required>
+                <input type="date" name="date" required>
+                <input type="number" name="absent_sessions" min="0" max="6" placeholder="Absent Sessions" required>
+                <textarea name="reason" placeholder="Reason" required></textarea>
+                <button type="submit">Submit</button>
+            </form>
+        </div>
+
+        <div id="status" class="form-card" style="display:none;">
+            <table>
+                <tr>
+                    <th>Date</th>
+                    <th>Absent</th>
+                    <th>Status</th>
+                </tr>
+                {% for r in history %}
+                <tr>
+                    <td>{{ r.date }}</td>
+                    <td>{{ r.absent_sessions }}</td>
+                    <td class="status-{{ r.status|lower }}">{{ r.status }}</td>
+                </tr>
+                {% endfor %}
+            </table>
+        </div>
+
     </div>
 
     <script>
-        // keep your existing JS here unchanged
+        function showTab(tab) {
+            document.getElementById("apply").style.display = tab === 'apply' ? "block" : "none";
+            document.getElementById("status").style.display = tab === 'status' ? "block" : "none";
+        }
     </script>
+
 </body>
 
 </html>
