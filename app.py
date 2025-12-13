@@ -267,6 +267,9 @@ def admin_pdf():
         download_name="attendance_report.pdf",
         mimetype="application/pdf"
     )
+@app.route("/healthz")
+def healthz():
+    return "OK", 200
 
 # ===================== RUN =====================
 if __name__ == "__main__":
