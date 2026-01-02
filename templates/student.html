@@ -4,58 +4,46 @@
 <head>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Student Dashboard</title>
+
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+
 </head>
 
 <body>
-
     <div class="dashboard-container">
-
         <div class="header">
             <h2>{{ name }} ({{ roll_no }})</h2>
-            <a href="/logout">Logout</a>
+            <a href="/logout" class="logout-btn">Logout</a>
         </div>
+
+
 
         <div class="stats-grid">
-            <div class="card">
-                Attendance %
-                <div class="value">{{ attendance }}%</div>
+            <div class="card">Attendance<div class="value">{{ attendance }}%</div>
             </div>
-
-            <div class="card">
-                Absent Today
-                <div class="value">{{ absent_today }}/6</div>
+            <div class="card">Absent Today<div class="value">{{ absent_today }}/6</div>
             </div>
-
-            <div class="card">
-                Last Date
-                <div class="value">{{ last_leave }}</div>
+            <div class="card">Last Leave<div class="value">{{ last_leave }}</div>
             </div>
-
-            <div class="card">
-                Approval
-                <div class="value status-{{ approval_status|lower }}">
-                    {{ approval_status }}
-                </div>
+            <div class="card">Status<div class="value status-{{ approval_status|lower }}">{{ approval_status }}</div>
             </div>
         </div>
 
-        <div class="tabs">
-            <button class="tab-btn active" onclick="showTab('apply')">Apply Leave</button>
-            <button class="tab-btn" onclick="showTab('status')">Check Status</button>
-        </div>
-
-        <div id="apply" class="form-card">
-            <form method="POST">
+        <div class="form-card">
+            <form method="POST" action="/student">
                 <input name="student_name" placeholder="Student Name" required>
-                <input type="date" name="date" required>
-                <input type="number" name="absent_sessions" min="0" max="6" placeholder="Absent Sessions" required>
+                <input type="date" name="date" id="todayDate" readonly>
+                <input type="number" name="absent_sessions" min="0" max="6" required>
                 <textarea name="reason" placeholder="Reason" required></textarea>
-                <button type="submit">Submit</button>
+                <button>Submit Leave</button>
+            </form>
+
+            <form method="POST" action="/cancel_leave">
+                <button class="cancel-btn">Cancel Leave</button>
             </form>
         </div>
 
-        <div id="status" class="form-card" style="display:none;">
+        <div class="form-card">
             <table>
                 <tr>
                     <th>Date</th>
@@ -70,17 +58,21 @@
                 </tr>
                 {% endfor %}
             </table>
+
+            {% if approval_status == "Approved" %}
+            <br>
+            <a href="/student/leave_pdf">
+                <button>Download Leave Permission PDF</button>
+            </a>
+            {% endif %}
         </div>
 
     </div>
 
     <script>
-        function showTab(tab) {
-            document.getElementById("apply").style.display = tab === 'apply' ? "block" : "none";
-            document.getElementById("status").style.display = tab === 'status' ? "block" : "none";
-        }
+        document.getElementById("todayDate").value =
+            new Date().toISOString().split("T")[0];
     </script>
-
 </body>
 
 </html>

@@ -1,175 +1,146 @@
-from flask import (
-    Flask, render_template, request,
-    redirect, session, jsonify, send_file
-)
+from flask import Flask, render_template, request, redirect, session, send_file
 from pymongo import MongoClient
 from bson.objectid import ObjectId
-from datetime import date, datetime, timedelta
-from werkzeug.security import generate_password_hash, check_password_hash
-import os, re, io
+from datetime import date
+import re, io
 
-# ===================== APP =====================
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image, Table
+from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.lib.pagesizes import A4
+from reportlab.lib.units import cm
+from reportlab.lib.enums import TA_RIGHT
+import os
 app = Flask(__name__)
-app.secret_key = os.environ.get("SECRET_KEY", "dev-secret")
+app.secret_key = "dev-secret"
 
-# ===================== MONGODB =====================
-MONGO_URI = os.environ.get("MONGO_URI")
-if not MONGO_URI:
-    raise Exception("MONGO_URI environment variable not set")
-
-client = MongoClient(MONGO_URI)
+# ---------------- DB ----------------
+client = MongoClient("mongodb://localhost:27017")
 db = client["attendance_db"]
-
 users = db["users"]
 records = db["records"]
 
-# ===================== CONSTANTS =====================
-STUDENT_REGEX = r'^25am(0[0-5][0-9]|06[0-2])$'
-TOTAL_SESSIONS_PER_DAY = 6
+STUDENT_REGEX = r'^25am\d{3}$'
+TOTAL_SESSIONS = 6
 
-# ===================== CREATE ADMIN (ONCE) =====================
-if users.count_documents({"role": "admin"}) == 0:
-    users.insert_one({
-        "username": "admin",
-        "password": generate_password_hash("admin123"),
-        "role": "admin"
-    })
-
-# ===================== AUTH =====================
-@app.route("/", methods=["GET", "HEAD"])
-def home():
-    return redirect("/login", code=302)
-
-
-@app.route("/login", methods=["GET", "POST"])
+# ---------------- LOGIN ----------------
+@app.route("/", methods=["GET", "POST"])
 def login():
     if request.method == "POST":
-        username = request.form["username"]
-        password = request.form["password"]
+        u = request.form["username"]
+        p = request.form["password"]
 
-        user = users.find_one({"username": username})
+        if u == "admin" and p == "admin123":
+            session["user"] = "admin"
+            session["role"] = "admin"
+            return redirect("/admin")
 
-        # ----- ADMIN / EXISTING USER -----
-        if user and check_password_hash(user["password"], password):
-            session["user"] = username
-            session["role"] = user["role"]
-            return redirect("/admin" if user["role"] == "admin" else "/student")
-
-        # ----- STUDENT AUTO REGISTER -----
-        if re.match(STUDENT_REGEX, username) and password == "12345":
-            if not user:
-                users.insert_one({
-                    "username": username,
-                    "password": generate_password_hash("12345"),
-                    "role": "student",
-                    "name": "Student"
-                })
-            session["user"] = username
+        if re.match(STUDENT_REGEX, u) and p == "12345":
+            session["user"] = u
             session["role"] = "student"
+            if not users.find_one({"username": u}):
+                users.insert_one({"username": u, "name": u})
             return redirect("/student")
-
-        return render_template("login.html", error="Invalid login")
 
     return render_template("login.html")
 
 @app.route("/logout")
 def logout():
     session.clear()
-    return redirect("/login")
+    return redirect("/")
 
-# ===================== STUDENT =====================
+# ---------------- STUDENT ----------------
 @app.route("/student", methods=["GET", "POST"])
 def student():
-    if "user" not in session or session["role"] != "student":
-        return redirect("/login")
+    if session.get("role") != "student":
+        return redirect("/")
 
     today = date.today().strftime("%Y-%m-%d")
 
-    # ---------- SUBMIT LEAVE ----------
+    # ---------- APPLY LEAVE ----------
     if request.method == "POST":
-        name = request.form["student_name"]
-        absent = int(request.form["absent_sessions"])
-        reason = request.form["reason"]
         leave_date = request.form["date"]
 
-        # validation
-        if absent < 0 or absent > TOTAL_SESSIONS_PER_DAY:
-            return redirect("/student")
-
-        # prevent duplicate leave for same date
-        if records.find_one({"username": session["user"], "date": leave_date}):
-            return redirect("/student")
-
-        users.update_one(
-            {"username": session["user"]},
-            {"$set": {"name": name}}
-        )
-
-        records.insert_one({
+        # ❗ PREVENT DUPLICATE ACTIVE LEAVE
+        existing = records.find_one({
             "username": session["user"],
-            "name": name,
-            "roll": session["user"],
             "date": leave_date,
-            "absent_sessions": absent,
-            "reason": reason,
-            "status": "Pending"
+            "status": {"$in": ["Pending", "Approved"]}
         })
-
+        if not existing:
+            records.insert_one({
+                "username": session["user"],
+                "roll": session["user"],
+                "name": request.form["student_name"],
+                "date": leave_date,
+                "absent_sessions": int(request.form["absent_sessions"]),
+                "reason": request.form["reason"],
+                "status": "Pending"
+            })
         return redirect("/student")
 
-    # ---------- ATTENDANCE CALC ----------
+    # ---------- FETCH HISTORY ----------
+    history = list(records.find(
+        {"username": session["user"]}
+    ).sort("_id", -1))
+
+    latest = history[0] if history else None
+    approval_status = latest["status"] if latest else "Not Submitted"
+    last_leave = latest["date"] if latest else "-"
+
+    # ---------- ABSENT TODAY (ONLY APPROVED) ----------
+    approved_today = records.find_one({
+        "username": session["user"],
+        "date": today,
+        "status": "Approved"
+    })
+    absent_today = approved_today["absent_sessions"] if approved_today else 0
+
+    # ---------- ATTENDANCE ----------
     approved = list(records.find({
         "username": session["user"],
         "status": "Approved"
     }))
 
-    total_possible = len(approved) * TOTAL_SESSIONS_PER_DAY
-    total_absent = sum(r["absent_sessions"] for r in approved)
-
-    attendance = round(
-        ((total_possible - total_absent) / total_possible) * 100, 2
-    ) if total_possible > 0 else 100
-
-    latest = records.find_one(
-        {"username": session["user"]},
-        sort=[("_id", -1)]
-    )
-
-    approval_status = latest["status"] if latest else "Not Submitted"
-    absent_today = (
-        latest["absent_sessions"]
-        if latest and latest["date"] == today
-        else 0
-    )
-    last_date = latest["date"] if latest else "None"
-
-    history = list(
-        records.find({"username": session["user"]}).sort("_id", -1)
-    )
+    if approved:
+        total = len(approved) * TOTAL_SESSIONS
+        absent = sum(r["absent_sessions"] for r in approved)
+        attendance = round(((total - absent) / total) * 100, 2)
+    else:
+        attendance = 100
 
     user = users.find_one({"username": session["user"]})
 
     return render_template(
         "student.html",
-        name=user.get("name", "Student"),
+        name=user["name"],
         roll_no=session["user"],
         attendance=attendance,
         absent_today=absent_today,
-        last_leave=last_date,
+        last_leave=last_leave,
         approval_status=approval_status,
         history=history
     )
 
-# ===================== ADMIN =====================
+# ---------------- CANCEL LEAVE ----------------
+@app.route("/cancel_leave", methods=["POST"])
+def cancel_leave():
+    records.update_one(
+        {"username": session["user"], "status": "Pending"},
+        {"$set": {"status": "Cancelled"}}
+    )
+    return redirect("/student")
+
+# ---------------- ADMIN ----------------
+from datetime import date
+
 @app.route("/admin")
 def admin():
-    if "user" not in session or session["role"] != "admin":
-        return redirect("/login")
+    if session.get("role") != "admin":
+        return redirect("/")
 
     today = date.today().strftime("%Y-%m-%d")
 
     leaves = list(records.find().sort("_id", -1))
-
     today_absent = records.count_documents({
         "date": today,
         "status": "Approved"
@@ -180,72 +151,43 @@ def admin():
         leaves=leaves,
         today_absent=today_absent
     )
-
 @app.route("/admin/action/<id>/<action>")
 def admin_action(id, action):
-    if "user" not in session or session["role"] != "admin":
-        return redirect("/login")
+    if session.get("role") != "admin":
+        return redirect("/")
 
     if action == "approve":
         records.update_one(
             {"_id": ObjectId(id)},
             {"$set": {"status": "Approved"}}
         )
+
     elif action == "reject":
         records.update_one(
             {"_id": ObjectId(id)},
             {"$set": {"status": "Rejected"}}
         )
+
     elif action == "delete":
         records.delete_one({"_id": ObjectId(id)})
 
     return redirect("/admin")
 
-# ===================== ADMIN STATS =====================
-@app.route("/admin/stats")
-def admin_stats():
-    filter_type = request.args.get("type", "week")
-    today = datetime.today()
-
-    if filter_type == "today":
-        match = {"date": today.strftime("%Y-%m-%d"), "status": "Approved"}
-    else:
-        days = 30 if filter_type == "month" else 7
-        start_date = today - timedelta(days=days)
-        match = {
-            "status": "Approved",
-            "date": {"$gte": start_date.strftime("%Y-%m-%d")}
-        }
-
-    pipeline = [
-        {"$match": match},
-        {"$group": {"_id": "$date", "absent": {"$sum": "$absent_sessions"}}},
-        {"$sort": {"_id": 1}}
-    ]
-
-    data = list(records.aggregate(pipeline))
-
-    return jsonify({
-        "labels": [d["_id"] for d in data],
-        "data": [d["absent"] for d in data]
-    })
-
-# ===================== ADMIN PDF =====================
 @app.route("/admin/pdf")
 def admin_pdf():
-    if "user" not in session or session["role"] != "admin":
-        return redirect("/login")
-
-    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle
-    from reportlab.lib.pagesizes import letter
-    from reportlab.lib import colors
+    if session.get("role") != "admin":
+        return redirect("/")
 
     buffer = io.BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=letter)
+    doc = SimpleDocTemplate(buffer, pagesize=A4)
 
-    data = [["Roll", "Name", "Date", "Absent", "Status"]]
+    styles = getSampleStyleSheet()
+    story = [Paragraph("<b>Attendance Report</b>", styles["Title"])]
+
+    table_data = [["Roll", "Name", "Date", "Absent", "Status"]]
+
     for r in records.find():
-        data.append([
+        table_data.append([
             r.get("roll", ""),
             r.get("name", ""),
             r.get("date", ""),
@@ -253,25 +195,88 @@ def admin_pdf():
             r.get("status", "")
         ])
 
-    table = Table(data)
-    table.setStyle(TableStyle([
-        ("BACKGROUND", (0, 0), (-1, 0), colors.lightgrey),
-        ("GRID", (0, 0), (-1, -1), 1, colors.black)
-    ]))
+    table = Table(table_data)
+    story.append(table)
 
-    doc.build([table])
+    doc.build(story)
     buffer.seek(0)
 
     return send_file(
         buffer,
         as_attachment=True,
-        download_name="attendance_report.pdf",
+        download_name="Admin_Attendance_Report.pdf",
         mimetype="application/pdf"
     )
-@app.route("/healthz")
-def healthz():
-    return "OK", 200
 
-# ===================== RUN =====================
+# ---------------- STUDENT PDF ----------------
+@app.route("/student/leave_pdf")
+def leave_pdf():
+    if session.get("role") != "student":
+        return redirect("/")
+
+    record = records.find_one(
+        {"username": session["user"], "status": "Approved"},
+        sort=[("_id", -1)]
+    )
+    if not record:
+        return redirect("/student")
+
+    today = date.today().strftime("%d-%m-%Y")
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=A4)
+
+    styles = getSampleStyleSheet()
+    story = []
+
+    story.append(Paragraph("<b>LEAVE PERMISSION LETTER</b>", styles["Title"]))
+    story.append(Spacer(1, 20))
+
+    right = styles["Normal"]
+    right.alignment = TA_RIGHT
+    story.append(Paragraph(f"Date: {today}", right))
+    story.append(Spacer(1, 20))
+
+    body = f"""
+    This is to certify that <b>{record['name']}</b>,
+    bearing Roll Number <b>{record['roll']}</b>,
+    is permitted to avail leave on <b>{record['date']}</b>
+    for <b>{record['absent_sessions']}</b> session(s).
+
+    <br/><br/>
+    Leave Status: <b>{record['status']}</b>
+
+    <br/><br/>
+    Reason:<br/>{record['reason']}
+    """
+    story.append(Paragraph(body, styles["Normal"]))
+    story.append(Spacer(1, 60))
+
+    # ✅ FIXED PATH (INSIDE FUNCTION)
+    signature_path = os.path.join(
+        app.root_path, "static", "images", "tutor_signature.png"
+    )
+
+    tutor_sign = Image(signature_path, 5 * cm, 2 * cm)
+
+    table = Table(
+        [
+            ["__________________", tutor_sign],
+            [record["name"], "Class Tutor"]
+        ],
+        colWidths=[7 * cm, 7 * cm]
+    )
+
+    story.append(table)
+    doc.build(story)
+
+    buffer.seek(0)
+    return send_file(
+        buffer,
+        as_attachment=True,
+        download_name="Leave_Permission_Letter.pdf",
+        mimetype="application/pdf"
+    )
+
+
 if __name__ == "__main__":
-    app.run()
+    app.run(debug=True)

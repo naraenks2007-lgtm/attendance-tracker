@@ -15,7 +15,7 @@
             font-family: Poppins
         }
 
-        body {
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/lottie-web/5.12.2/lottie.min.js"></script><script src="{{ url_for('static', filename='js/login.js') }}"></script>body {
             margin: 0;
             min-height: 100vh;
             display: flex;
@@ -89,7 +89,7 @@
     <div class="login-box">
 
         <div class="login-left">
-            <div id="lottie-login" style="width:260px;height:260px;"></div>
+            <div id="lottie-login"></div>
 
         </div>
 
@@ -102,7 +102,8 @@
 
             <form method="POST">
                 <input name="username" placeholder="Username (25am001 / admin)" required>
-                <input type="password" name="password" placeholder="Password" required>
+                <input type="password" id="password" name="password" placeholder="Password" required>
+
                 <button type="submit">Log in</button>
             </form>
 

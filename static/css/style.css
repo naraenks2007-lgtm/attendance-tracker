@@ -15,6 +15,39 @@ body {
     padding: 20px;
 }
 
+.logout-btn {
+    text-decoration: none;
+    background: #ef4444;
+    color: white;
+    padding: 8px 14px;
+    border-radius: 8px;
+    font-size: 14px;
+}
+
+
+
+.login-left {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background: #eef2ff;
+}
+
+/* Lottie container */
+#lottie-login {
+    width: 320px;
+    height: 320px;
+}
+
+/* Mobile */
+@media (max-width: 768px) {
+    #lottie-login {
+        width: 200px;
+        height: 200px;
+    }
+}
+
+
 .header {
     display: flex;
     justify-content: space-between;
@@ -50,11 +83,13 @@ body {
 }
 
 .status-pending {
-    color: red;
+    color: orange;
 }
 
+
+
 .status-rejected {
-    color: orange;
+    color: rgb(240, 30, 30);
 }
 
 .tabs {
