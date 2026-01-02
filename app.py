@@ -11,13 +11,16 @@ from reportlab.lib.units import cm
 from reportlab.lib.enums import TA_RIGHT
 import os
 app = Flask(__name__)
-app.secret_key = "dev-secret"
+app.secret_key = os.environ.get("SECRET_KEY", "dev-secret")
+
 
 # ---------------- DB ----------------
 MONGO_URI = os.environ.get("MONGO_URI")
 
 client = MongoClient(MONGO_URI)
 db = client["attendance_db"]
+users = db["users"]
+records = db["records"]
 
 
 STUDENT_REGEX = r'^25am\d{3}$'
@@ -27,8 +30,12 @@ TOTAL_SESSIONS = 6
 @app.route("/", methods=["GET", "POST"])
 def login():
     if request.method == "POST":
-        u = request.form["username"]
-        p = request.form["password"]
+        u = request.form.get("username")
+        p = request.form.get("password")
+
+        if not u or not p:
+            return redirect("/")
+
 
         if u == "admin" and p == "admin123":
             session["user"] = "admin"
