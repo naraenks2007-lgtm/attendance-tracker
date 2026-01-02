@@ -14,10 +14,11 @@ app = Flask(__name__)
 app.secret_key = "dev-secret"
 
 # ---------------- DB ----------------
-client = MongoClient("mongodb://localhost:27017")
+MONGO_URI = os.environ.get("MONGO_URI")
+
+client = MongoClient(MONGO_URI)
 db = client["attendance_db"]
-users = db["users"]
-records = db["records"]
+
 
 STUDENT_REGEX = r'^25am\d{3}$'
 TOTAL_SESSIONS = 6
